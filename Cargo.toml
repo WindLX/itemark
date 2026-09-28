@@ -15,4 +15,9 @@ thiserror = "2.0.21"
 toml = "1.1.6"
 
 [dev-dependencies]
+criterion = "0.8.2"
 tempfile = "3.27.0"
+
+[[bench]]
+name = "worklog"
+harness = false

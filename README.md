@@ -17,3 +17,16 @@
 - [工作记录说明](worklog/README.md)：记录模型、状态与引用约定；v0 接管映射见 [v0 记录适配说明](docs/v0-adaptation.md)。
 
 事项 Markdown 是记录权威；索引、总账和交接摘要都是可重建的派生内容。新会话从项目路径进入，先看工作记录入口与摘要，再按稳定 ID 读事项详情。
+
+## 性能基准
+
+`benches/worklog.rs` 用 [criterion](https://github.com/bheisler/criterion.rs) 覆盖写入路径（`add`：分配 ID、渲染模板、写盘、更新索引）、读取路径（`show` 的单条读取与 `list` 的索引扫描）以及 `check` 引用校验的规模增长（50 / 200 / 800 条记录）。
+
+```text
+cargo bench              # 全部基准
+cargo bench -- add       # 只跑写路径
+cargo bench -- read      # 只跑读取路径
+cargo bench -- check     # 只跑引用校验
+```
+
+基准直接调用库 API 并在临时项目里自建夹具，因此不含 CLI 进程启动与参数解析成本；`just ci` 不运行基准，只编译它们。具体数值随机器变化，基准本身用于看同一台机器上代码改动前后的相对变化。
