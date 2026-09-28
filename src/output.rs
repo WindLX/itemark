@@ -117,7 +117,9 @@ labels! {
 /// 用语言相关的句子模板渲染人读文本：模板里的 `{}` 按顺序被 `parts` 填充。
 ///
 /// 模板来自 [`Labels`]，所以一句完整的话只有一处定义；命令实现不再自己拼接面向使用者的
-/// 中文句子。
+/// 中文句子。例外是 `--help` 与用法说明：那些文案固定在 `src/cli/args.rs` 的参数声明与
+/// [`crate::cli::args::localized_command`] 里，随命令树一起在编译期确定，不随 `--language`
+/// 切换。
 #[must_use]
 pub fn fill(template: &str, parts: &[&str]) -> String {
     let mut rendered = String::with_capacity(template.len() + 16);

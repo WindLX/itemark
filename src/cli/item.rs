@@ -220,8 +220,12 @@ pub fn log(context: &Context, args: &LogArgs) -> Result<()> {
 
     workspace.transaction(|transaction| {
         let mut record = transaction.current(&args.id)?;
+        let section = args
+            .section
+            .as_deref()
+            .unwrap_or(crate::domain::section::PROGRESS);
         record.body.append_line(
-            &args.section,
+            section,
             &fill(labels(&language).log_note(), &[&date, args.text.trim()]),
         );
         transaction.update(&args.id, Some(expected.as_str()), &record.render())?;

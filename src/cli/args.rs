@@ -7,8 +7,6 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
 
-use crate::domain::section::PROGRESS;
-
 #[derive(Debug, Parser)]
 #[command(
     name = "worklog",
@@ -38,16 +36,15 @@ pub struct GlobalArgs {
     #[arg(long, global = true, help_heading = "全局选项", value_name = "BCP47")]
     pub language: Option<String>,
 
-    /// 人读输出的着色策略：auto 仅在终端且未设置 NO_COLOR 时着色
+    /// 人读输出的着色策略：auto（默认）仅在终端且未设置 NO_COLOR 时着色
     #[arg(
         long,
         global = true,
         help_heading = "全局选项",
         value_name = "auto|always|never",
-        default_value = "auto",
         value_parser = parse_color
     )]
-    pub color: crate::style::Choice,
+    pub color: Option<crate::style::Choice>,
 
     /// 以 JSON 呈现结果
     #[arg(long, global = true, help_heading = "全局选项")]
@@ -203,8 +200,8 @@ pub struct LogArgs {
     pub date: Option<String>,
 
     /// 写入的正文分节，默认「进展」
-    #[arg(long, value_name = "分节", default_value = PROGRESS)]
-    pub section: String,
+    #[arg(long, value_name = "分节")]
+    pub section: Option<String>,
 }
 
 #[derive(Debug, Args)]
@@ -318,12 +315,22 @@ fn parse_assignment(text: &str) -> Result<(String, String), String> {
     Ok((key.trim().to_string(), value.to_string()))
 }
 
+/// 帮助模板：与 clap 默认模板一致，只把硬编码的 `Usage:` 换成「用法：」。
+const HELP_TEMPLATE: &str = "\
+{before-help}{about-with-newline}
+用法：{usage}
+
+{all-args}{after-help}";
+
 /// 构建帮助文案已本地化的命令树。
 ///
-/// clap 内置的 help/version 选项与 `help` 子命令说明固定为英文，这里统一改成项目语言；
-/// 命令名、选项名与取值保持稳定，不随语言变化。
+/// 命令名、选项名与取值保持稳定，不随语言变化；帮助文案固定在编译期，也不随
+/// `--language` 切换。clap 自带的 `Usage:`、`Options:`、`Arguments:`、`Commands:` 都是
+/// 硬编码英文，这里换成中文标题：段落标题由每个参数自己的 `help_heading` 决定，
+/// `build()` 之后补上的内置参数也在改写范围内。
 ///
-/// 这些内置参数由 clap 在构建命令树时补上，所以先 `build()` 再改写。
+/// 这些内置参数由 clap 在构建命令树时补上，所以先 `build()` 再改写；`build()` 会递归
+/// 构建并复制整棵命令树（clap 的慢路径），只在启动时跑一次。
 #[must_use]
 pub fn localized_command() -> clap::Command {
     let mut command = <Cli as clap::CommandFactory>::command();
@@ -332,18 +339,32 @@ pub fn localized_command() -> clap::Command {
 }
 
 fn localize(command: clap::Command) -> clap::Command {
-    let mut command = command;
+    let mut command = command
+        .subcommand_help_heading("命令")
+        .help_template(HELP_TEMPLATE)
+        .mut_args(|arg| {
+            if arg.get_help_heading().is_some() {
+                arg
+            } else if arg.get_id().as_str() == "help" || arg.get_id().as_str() == "version" {
+                arg.help_heading("全局选项")
+            } else if arg.is_positional() {
+                arg.help_heading("参数")
+            } else {
+                arg.help_heading("选项")
+            }
+        });
     if command
         .get_arguments()
         .any(|arg| arg.get_id().as_str() == "help")
     {
-        command = command.mut_arg("help", |arg| arg.help("打印帮助"));
+        // 一并改写 `long_help`：任一参数带上长帮助后，clap 会给 `--help` 重新显示英文说明。
+        command = command.mut_arg("help", |arg| arg.help("打印帮助").long_help("打印帮助"));
     }
     if command
         .get_arguments()
         .any(|arg| arg.get_id().as_str() == "version")
     {
-        command = command.mut_arg("version", |arg| arg.help("打印版本"));
+        command = command.mut_arg("version", |arg| arg.help("打印版本").long_help("打印版本"));
     }
     if command
         .get_subcommands()
