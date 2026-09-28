@@ -140,11 +140,13 @@ v0 文件完全没有 `completion_note`、`completion_evidence`、`dropped` 三�
 - 八个文件的正文分节都是 `## 目标`、`## 验收`、`## 当前下一步`、`## 历史进展`、`## 证据`。
 - 结论：没有任何一个文件能在**零内容改动**下满足新记录格式契约；`WL-0001` 根本不参与适配，必须保持逐字节不变。
 
+> 补记（接管完成后）：本节与 3.2 节是**接管前**的推导，其中的「不得改动」已被第 4.0 节的实际执行取代。用户随后要求把手工记录并入自举，因此 `docs/worklog/WL-0001.md` 在删除前始终与 v0 基线逐字节一致（`git show ace45c7^:docs/worklog/WL-0001.md` 与提交 `4c9e733` 中的版本相同），而迁移副本 `worklog/items/WL-0001.md` 按第 2 节映射补写了 `kind`/`group` 并在末尾追加 `## 完成说明`。
+
 ### 3.2 逐文件处置
 
 | 文件 | 现存头部 | 处置 |
 | --- | --- | --- |
-| `docs/worklog/WL-0001.md` | `id: WL-0001`、`title: Establish the manual worklog baseline`、`status: done`、`parent: null`、`depends_on: []` | **不得改动。** 作为历史兼容样本（grandfathered historical sample），必须逐字节保持不变，即使按新契约它缺少 `kind`/`group`、无法通过 `check`，也不得补写、移动或重写。 |
+| `docs/worklog/WL-0001.md` | `id: WL-0001`、`title: Establish the manual worklog baseline`、`status: done`、`parent: null`、`depends_on: []` | **接管前结论：不得改动。** 作为历史兼容样本（grandfathered historical sample），按当时的约定必须逐字节保持不变，即使按新契约它缺少 `kind`/`group`、无法通过 `check`。实际执行见第 4.0 节：原始文件删除前未被改动，迁移副本补写了 `kind`/`group` 与 `## 完成说明`。 |
 | `docs/worklog/WL-0002.md` | `status: todo`、`parent: null`、`depends_on: []` | 需要新增 `kind`、新增 `group`；`status` 仅在接管的 kind 声明了 `status` 字段时才保留为业务状态，且取值须被该字段允许。无 `completion_note`/`completion_evidence`。 |
 | `docs/worklog/WL-0003.md` | `status: todo`、`parent: null`、`depends_on: [WL-0004, WL-0008]` | 需要新增 `kind`、新增 `group`。正文 H1 为「Check continuation and handoff summaries」，与头部 `title`「Verify v0 takeover and cross-session continuation」不一致；新格式标题只取头部 `title`，H1 留在前言中，因此不构成契约问题，也不要求改名。依赖 `WL-0004`、`WL-0008`。 |
 | `docs/worklog/WL-0004.md` | `status: todo`、`parent: null`、`depends_on: [WL-0007]` | 需要新增 `kind`、新增 `group`。正文 H1 为「Prevent lost records across concurrent CLI writes」，与头部 `title` 不同，同上不构成契约问题。依赖 `WL-0007`。 |
