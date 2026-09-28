@@ -132,12 +132,7 @@ fn check(context: &Context, args: &args::CheckArgs) -> Result<()> {
     let report = match args.id.as_deref() {
         Some(id) => {
             let record = workspace.index().require(id)?;
-            let known: Vec<&str> = workspace
-                .index()
-                .records()
-                .iter()
-                .filter_map(|record| record.id().ok())
-                .collect();
+            let known = workspace.index().by_id();
             let mut report = crate::checks::CheckReport {
                 issues: Vec::new(),
                 checked: 1,

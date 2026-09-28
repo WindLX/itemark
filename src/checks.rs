@@ -121,11 +121,8 @@ pub fn check_all(workspace: &Workspace) -> CheckReport {
         }
     }
 
-    let known: Vec<String> = records
-        .iter()
-        .filter_map(|record| record.id().ok().map(str::to_string))
-        .collect();
-    let known: Vec<&str> = known.iter().map(String::as_str).collect();
+    // 引用目标按 ID 建索引，引用校验因此是 O(n log n)。
+    let known = workspace.index().by_id();
 
     for record in records {
         let Ok(id) = record.id() else {
@@ -162,7 +159,7 @@ pub fn check_record(
     config: &Config,
     record: &Record,
     target: &str,
-    known_ids: &[&str],
+    known_ids: &BTreeMap<String, &Record>,
     issues: &mut Vec<Issue>,
 ) {
     let Ok(kind_name) = record.kind() else {
@@ -234,7 +231,7 @@ pub fn check_record(
                     target: target.to_string(),
                     detail: format!("`{field}` must not reference the record itself"),
                 });
-            } else if !known_ids.contains(&reference.as_str()) {
+            } else if !known_ids.contains_key(&reference) {
                 issues.push(Issue {
                     kind: IssueKind::BrokenReference,
                     target: target.to_string(),
