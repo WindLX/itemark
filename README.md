@@ -6,6 +6,8 @@
 
 当前 CLI 已实现（`worklog` 二进制，仓库门禁为 `just ci`），本仓库用它自举管理自身事项：配置在 `worklog.toml`，活跃记录在 `worklog/items/`，模板在 `worklog/templates/`。下列 Markdown 文档承载需求、领域词汇与设计约定。
 
+运行方式：在仓库内 `cargo build` 后使用 `target/debug/worklog <命令>`，或直接用 `cargo run -q -- <命令>`；把二进制装进 `PATH` 后，下文与文档里的 `worklog <命令>` 才能原样执行。
+
 - [项目约定](AGENTS.md)：协作和改动原则。
 - [需求与验收](docs/spec.md)：首期要解决的问题和范围。
 - [领域词汇](CONTEXT.md)：核心术语。

@@ -10,7 +10,7 @@ Use the project's Worklog records as the source for tracked work, facts, and ter
 ## Locate and read
 
 1. Find the project `worklog.toml` and the configured Worklog root. Resolve the root as the project configuration specifies; the recommended layout resolves a relative root from the TOML file, and resolves a kind template from the Worklog root.
-2. Read the current summary, then use list/search to find relevant records. Before adding a record, search by its proposed name, meaning, and existing IDs to avoid duplicates.
+2. Read the current summary, then use list/search to find relevant records. Before adding a record, search by its proposed name, meaning, and existing IDs to avoid duplicates. Before starting an unfinished record, read it and check that its `depends_on` targets are complete; start with records whose dependencies are satisfied, and say which record and section the next action comes from.
 3. Use kind show and group list to select definitions that actually exist in this project. Read a record by stable ID when its details matter. Do not hardcode kind names, group names, field schemas, or business states in this skill.
 4. Check the installed CLI's help before relying on exact arguments or options. Prefer JSON for machine-to-machine calls when the current CLI advertises it; keep human-facing output in the configured project language and preserve machine keys and IDs.
 
