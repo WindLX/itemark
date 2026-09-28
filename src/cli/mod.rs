@@ -106,7 +106,12 @@ fn list(context: &Context, args: &ListArgs) -> Result<()> {
         records.retain(|record| record.kind().is_ok_and(|name| name == kind));
     }
     if let Some(status) = args.status.as_deref() {
-        records.retain(|record| record.status(workspace.config()).as_deref() == Some(status));
+        // 既接受判定键（`done_unverified`、`none`），也接受 kind 声明的原始取值。
+        let config = workspace.config();
+        records.retain(|record| {
+            crate::status::of(config, record).as_key() == status
+                || record.status(config).as_deref() == Some(status)
+        });
     }
     item::print_records(context.mode, &language, workspace.config(), &records)
 }

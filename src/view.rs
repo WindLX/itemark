@@ -7,43 +7,8 @@ use crate::output::{labels, print_json};
 use crate::record::Record;
 use crate::workspace::Workspace;
 
-/// 记录在总览中的业务状态分组。
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum State {
-    Todo,
-    InProgress,
-    Blocked,
-    Unverified,
-    Done,
-    /// 没有声明业务状态字段的 kind（例如事实、术语类记录）。
-    NoStatus,
-}
-
-impl State {
-    #[must_use]
-    pub fn as_key(self) -> &'static str {
-        match self {
-            Self::Todo => "todo",
-            Self::InProgress => "in_progress",
-            Self::Blocked => "blocked",
-            Self::Unverified => "done_unverified",
-            Self::Done => "done",
-            Self::NoStatus => "none",
-        }
-    }
-
-    #[must_use]
-    pub fn all() -> [Self; 6] {
-        [
-            Self::InProgress,
-            Self::Blocked,
-            Self::Unverified,
-            Self::Todo,
-            Self::Done,
-            Self::NoStatus,
-        ]
-    }
-}
+/// 记录的业务状态来自 [`crate::status::of`]，总览只做分组呈现。
+pub use crate::status::State;
 
 /// 总览中的一条记录。
 #[derive(Debug, Clone)]
@@ -134,7 +99,7 @@ pub fn build(workspace: &Workspace, generated_at: String) -> Overview {
 fn entry_of(config: &crate::workspace::Config, record: &Record) -> Option<Entry> {
     let id = record.id().ok()?.to_string();
     let kind_name = record.kind().unwrap_or("").to_string();
-    let state = state_of(config, record);
+    let state = crate::status::of(config, record);
     Some(Entry {
         id,
         title: record.title().to_string(),
@@ -146,42 +111,6 @@ fn entry_of(config: &crate::workspace::Config, record: &Record) -> Option<Entry>
         next_step: next_step_of(record),
         dropped: record.lifecycle().is_dropped(),
     })
-}
-
-fn state_of(config: &crate::workspace::Config, record: &Record) -> State {
-    let Some(kind) = record.kind().ok().and_then(|name| config.kind(name)) else {
-        return State::NoStatus;
-    };
-    // 没有业务状态字段的 kind（事实、术语）不计入四个工作状态。
-    let Some(field) = kind.status_field() else {
-        return State::NoStatus;
-    };
-    let Some(value) = record.get(field) else {
-        return State::NoStatus;
-    };
-    let value = value.display();
-    let value = value.trim();
-    if value.is_empty() {
-        return State::NoStatus;
-    }
-    let at_completion = kind.completion_rule().is_some_and(|(rule_field, values)| {
-        rule_field == field && values.iter().any(|v| v == value)
-    });
-    match value {
-        "todo" => State::Todo,
-        "in_progress" => State::InProgress,
-        "blocked" => State::Blocked,
-        _ if at_completion => {
-            if record.completion_evidence().trim().is_empty()
-                || record.completion_note().trim().is_empty()
-            {
-                State::Unverified
-            } else {
-                State::Done
-            }
-        }
-        _ => State::Todo,
-    }
 }
 
 /// 记录的「下一步」：优先取 kind 或记录中的下一步分节，其次取最后一条进展。
@@ -395,7 +324,7 @@ pub fn handoff_json(overview: &Overview) -> serde_json::Value {
     })
 }
 
-fn state_label(labels: &crate::output::Labels, state: State) -> &'static str {
+pub(crate) fn state_label(labels: &crate::output::Labels, state: State) -> &'static str {
     match state {
         State::Todo => labels.todo(),
         State::InProgress => labels.in_progress(),

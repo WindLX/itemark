@@ -8,7 +8,6 @@ use std::fmt;
 
 use crate::kind::check_field_value;
 use crate::record::Record;
-use crate::record::{DEFAULT_COMPLETION_SECTION, DEFAULT_EVIDENCE_SECTION};
 use crate::workspace::Workspace;
 use crate::workspace::config::Config;
 
@@ -245,7 +244,7 @@ pub fn check_record(
         }
     }
 
-    let missing = missing_completion_parts(config, record);
+    let missing = crate::status::completion_gaps(config, record);
     if !missing.is_empty() {
         issues.push(Issue {
             kind: IssueKind::CompletionEvidence,
@@ -258,51 +257,4 @@ pub fn check_record(
     }
 }
 
-/// 完成说明以显式标注开头时视为「已声明未验证」，不再要求证据。
-///
-/// 只有形如 `未验证：说明` / `unverified: note` 的显式标注才算声明；正文里偶然出现
-/// 「未验证」字样的普通说明仍然按缺少完成依据处理。
-#[must_use]
-pub fn is_unverified_note(note: &str) -> bool {
-    let note = note.trim().to_lowercase();
-    for marker in ["unverified", "未验证"] {
-        if let Some(rest) = note.strip_prefix(marker) {
-            let rest = rest.trim_start();
-            return rest.is_empty() || rest.starts_with(':') || rest.starts_with('：');
-        }
-    }
-    false
-}
-
-/// 写入时的完成规则：返回需要补齐的完成说明或证据名称。
-#[must_use]
-pub fn missing_completion_parts(config: &Config, record: &Record) -> Vec<String> {
-    let Ok(kind_name) = record.kind() else {
-        return Vec::new();
-    };
-    let Some(kind) = config.kind(kind_name) else {
-        return Vec::new();
-    };
-    let Some((field, values)) = kind.completion_rule() else {
-        return Vec::new();
-    };
-    let current = record
-        .get(field)
-        .map_or_else(String::new, crate::domain::Scalar::display);
-    let current = current.trim();
-    if current.is_empty() || !values.iter().any(|value| value == current) {
-        return Vec::new();
-    }
-    let note = record.completion_note();
-    if is_unverified_note(&note) {
-        return Vec::new();
-    }
-    let mut missing = Vec::new();
-    if note.trim().is_empty() {
-        missing.push(DEFAULT_COMPLETION_SECTION.to_string());
-    }
-    if record.completion_evidence().trim().is_empty() {
-        missing.push(DEFAULT_EVIDENCE_SECTION.to_string());
-    }
-    missing
-}
+// 完成依据的检查由 `crate::status::completion_gaps` 唯一判定；`check` 只把缺口呈现为检查发现。

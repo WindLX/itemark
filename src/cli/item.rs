@@ -100,8 +100,8 @@ pub fn add(context: &Context, args: &AddArgs) -> Result<()> {
             .collect();
         check_references(&record, &known)?;
 
-        if writes_completion(kind, &args.set) {
-            let missing = crate::checks::missing_completion_parts(config, &record);
+        if crate::status::writes_completion(kind, &args.set) {
+            let missing = crate::status::completion_gaps(config, &record);
             if !missing.is_empty() {
                 return Err(WorkspaceError::usage(format!(
                     "setting the completion field to its completion value requires a non-empty {}; add it (or mark the result as unverified) before recording completion",
@@ -170,8 +170,8 @@ pub fn update(context: &Context, args: &UpdateArgs) -> Result<()> {
             .collect();
         check_references(&record, &known)?;
 
-        if writes_completion(kind, &args.set) {
-            let missing = crate::checks::missing_completion_parts(&config, &record);
+        if crate::status::writes_completion(kind, &args.set) {
+            let missing = crate::status::completion_gaps(&config, &record);
             if !missing.is_empty() {
                 return Err(WorkspaceError::usage(format!(
                     "setting the completion field to its completion value requires a non-empty {}; add one (or mark the result as unverified) before recording completion",
@@ -392,19 +392,6 @@ fn check_references(record: &Record, known: &[String]) -> Result<()> {
     Ok(())
 }
 
-/// 本次显式写入是否把 kind 的完成字段设成了完成值。
-fn writes_completion(kind: &crate::workspace::KindConfig, values: &[(String, String)]) -> bool {
-    let Some((field, completion_values)) = kind.completion_rule() else {
-        return false;
-    };
-    values.iter().any(|(key, value)| {
-        key == field
-            && completion_values
-                .iter()
-                .any(|candidate| candidate == value.trim())
-    })
-}
-
 /// 呈现一条记录：JSON 或人读文本。
 pub fn print_record(
     mode: OutputMode,
@@ -502,6 +489,7 @@ pub fn record_json(config: &Config, record: &Record) -> serde_json::Value {
         "title": record.title(),
         "fields": serde_json::Value::Object(fields),
         "status": record.status(config),
+        "state": crate::status::of(config, record).as_key(),
         "parent": record.parent(),
         "depends_on": record.depends_on(),
         "completion_note": record.completion_note(),
@@ -575,14 +563,21 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
         labels.title(),
         record.title(),
     );
-    if let Some(status) = record.status(config) {
+    let state = crate::status::of(config, record);
+    if state != crate::status::State::NoStatus {
         let key = record
             .kind()
             .ok()
             .and_then(|name| config.kind(name))
             .and_then(crate::workspace::KindConfig::status_field)
             .unwrap_or("status");
-        push_line(&mut out, &mut printed, key, labels.status(), &status);
+        push_line(
+            &mut out,
+            &mut printed,
+            key,
+            labels.status(),
+            crate::view::state_label(&labels, state),
+        );
     }
     if let Some(parent) = record.parent() {
         push_line(&mut out, &mut printed, "parent", labels.parent(), &parent);
@@ -648,9 +643,12 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
 #[must_use]
 pub fn record_line(language: &str, config: &Config, record: &Record) -> String {
     let kind = record.kind().unwrap_or("");
-    let status = record
-        .status(config)
-        .map_or_else(String::new, |status| format!(" · {status}"));
+    let state = crate::status::of(config, record);
+    let status = if state == crate::status::State::NoStatus {
+        String::new()
+    } else {
+        format!(" · {}", state.as_key())
+    };
     let lifecycle = if record.lifecycle().is_dropped() {
         format!(" · {}", labels(language).dropped())
     } else {
