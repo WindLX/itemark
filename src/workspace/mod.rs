@@ -64,6 +64,14 @@ impl Workspace {
         Ok(())
     }
 
+    /// 写入一条记录后就地更新内存索引。
+    ///
+    /// 传入的是刚写入磁盘的全文，因此不必再从磁盘读回；一次写操作只需在开始时扫一次项目。
+    pub fn note_written(&mut self, path: &Path, text: &str) -> Result<()> {
+        self.index.upsert(Record::parse(path, text.to_string())?);
+        Ok(())
+    }
+
     #[must_use]
     pub fn project_language(&self, cli: Option<&str>) -> String {
         self.config.effective_language(cli)
@@ -149,7 +157,7 @@ impl Transaction<'_> {
             );
         }
         write_new(&path, text)?;
-        self.workspace.refresh()?;
+        self.workspace.note_written(&path, text)?;
         Ok(path)
     }
 
@@ -168,7 +176,7 @@ impl Transaction<'_> {
             }
         }
         write_new(&path, text)?;
-        self.workspace.refresh()?;
+        self.workspace.note_written(&path, text)?;
         Ok(path)
     }
 }

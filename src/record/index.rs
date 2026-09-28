@@ -51,6 +51,21 @@ impl ItemIndex {
             .find(|record| record.id().is_ok_and(|candidate| candidate == id))
     }
 
+    /// 就地替换或插入一条记录，避免一次写操作重扫整个项目。
+    pub fn upsert(&mut self, record: Record) {
+        let path = record.path.clone();
+        match self
+            .records
+            .iter()
+            .position(|existing| existing.path == path)
+        {
+            Some(position) => self.records[position] = record,
+            None => self.records.push(record),
+        }
+        self.records
+            .sort_by(|left, right| left.id().unwrap_or("").cmp(right.id().unwrap_or("")));
+    }
+
     pub fn require(&self, id: &str) -> Result<&Record> {
         self.find(id)
             .ok_or_else(|| WorkspaceError::usage(format!("unknown worklog item `{id}`")))

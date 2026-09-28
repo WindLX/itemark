@@ -114,7 +114,6 @@ pub fn add(context: &Context, args: &AddArgs) -> Result<()> {
         Ok(id)
     })?;
 
-    workspace.refresh()?;
     let record = workspace.index().require(&id)?;
     if !context.mode.is_json() {
         println!("{} {}", labels(&language).created(), id);
@@ -189,7 +188,6 @@ pub fn update(context: &Context, args: &UpdateArgs) -> Result<()> {
         Ok(())
     })?;
 
-    workspace.refresh()?;
     let record = workspace.index().require(&args.id)?;
     if !context.mode.is_json() {
         println!("{} {}", labels(&language).updated(), args.id);
@@ -217,7 +215,6 @@ pub fn log(context: &Context, args: &LogArgs) -> Result<()> {
         Ok(())
     })?;
 
-    workspace.refresh()?;
     let record = workspace.index().require(&args.id)?;
     if !context.mode.is_json() {
         println!("{} {}", labels(&language).updated(), args.id);
@@ -249,7 +246,6 @@ fn lifecycle(context: &Context, id: &str, dropped: bool, reason: Option<&str>) -
         transaction.update(id, Some(expected.as_str()), &record.render())?;
         Ok(())
     })?;
-    workspace.refresh()?;
     let record = workspace.index().require(id)?;
     if !context.mode.is_json() {
         let labels = labels(&language);
