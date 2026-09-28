@@ -28,3 +28,16 @@ fn records_are_listed_and_searched_by_group_kind_and_text() {
         "search returns only the matching record"
     );
 }
+
+#[test]
+fn an_empty_selection_says_so_instead_of_printing_nothing() {
+    let project = Project::new();
+    project.configure();
+    project.add_note("研究记录", "研究");
+
+    let zh = project.ok(&["list", "--group", "产品"]);
+    assert_eq!(zh.trim(), "无匹配记录");
+
+    let en = project.ok(&["--language", "en", "list", "--group", "产品"]);
+    assert_eq!(en.trim(), "no matching records");
+}

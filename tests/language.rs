@@ -64,3 +64,20 @@ fn record_text_uses_the_language_separator() {
     assert!(en.contains("title: 跨语言记录"), "{en}");
     assert!(!en.contains('：'), "英文输出用半角冒号：{en}");
 }
+
+#[test]
+fn kind_field_rows_follow_the_language() {
+    let project = Project::new();
+    project.configure();
+
+    let zh = project.ok(&["kind", "show", "work"]);
+    assert!(zh.contains("- title：string（必填）"), "{zh}");
+    assert!(
+        zh.contains("- status：enum [todo|in_progress|blocked|done]（必填）"),
+        "{zh}"
+    );
+
+    let en = project.ok(&["--language", "en", "kind", "show", "work"]);
+    assert!(en.contains("- title: string (required)"), "{en}");
+    assert!(!en.contains('：'), "{en}");
+}

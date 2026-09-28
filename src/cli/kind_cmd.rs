@@ -160,8 +160,11 @@ pub fn show(context: &Context, args: &KindShowArgs) -> Result<()> {
                 format!(" [{}]", field.values.join("|"))
             };
             println!(
-                "- {}: {}{}{}",
-                field.name, field.field_type, required, values
+                "{}",
+                fill(
+                    labels.field_line(),
+                    &[&field.name, &field.field_type, &values, required]
+                )
             );
         }
         if let Ok(Some(body)) = template_body(config, kind) {

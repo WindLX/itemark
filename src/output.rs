@@ -110,6 +110,8 @@ labels! {
     source_line => "\n{}：{}\n", "\n{}: {}\n";
     issue_line => "- {}：{}\n", "- {}: {}\n";
     group_created => "{} group {}（{}）", "{} group {} ({})";
+    field_line => "- {}：{}{}{}", "- {}: {}{}{}";
+    no_matches => "无匹配记录", "no matching records";
 }
 
 /// 用语言相关的句子模板渲染人读文本：模板里的 `{}` 按顺序被 `parts` 填充。

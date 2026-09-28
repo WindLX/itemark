@@ -27,29 +27,30 @@ pub struct Cli {
 #[derive(Debug, Args)]
 pub struct GlobalArgs {
     /// 项目目录；默认从当前目录向上查找 `worklog.toml`
-    #[arg(long, global = true, value_name = "目录")]
+    #[arg(long, global = true, help_heading = "全局选项", value_name = "目录")]
     pub project: Option<PathBuf>,
 
     /// 直接指定 Worklog root，覆盖项目配置
-    #[arg(long, global = true, value_name = "目录")]
+    #[arg(long, global = true, help_heading = "全局选项", value_name = "目录")]
     pub root: Option<PathBuf>,
 
     /// 显式指定项目语言，覆盖项目配置
-    #[arg(long, global = true, value_name = "BCP47")]
+    #[arg(long, global = true, help_heading = "全局选项", value_name = "BCP47")]
     pub language: Option<String>,
 
     /// 人读输出的着色策略：auto 仅在终端且未设置 NO_COLOR 时着色
     #[arg(
         long,
         global = true,
-        value_name = "WHEN",
+        help_heading = "全局选项",
+        value_name = "auto|always|never",
         default_value = "auto",
         value_parser = parse_color
     )]
     pub color: crate::style::Choice,
 
     /// 以 JSON 呈现结果
-    #[arg(long, global = true)]
+    #[arg(long, global = true, help_heading = "全局选项")]
     pub json: bool,
 }
 
@@ -99,18 +100,18 @@ pub struct InitArgs {
 #[derive(Debug, Args)]
 pub struct AddArgs {
     /// kind 名称；必须在项目配置中已声明
-    #[arg(long, value_name = "KIND")]
+    #[arg(long, value_name = "kind 名称")]
     pub kind: String,
 
     /// 所属一级 group；必须在项目配置中已声明
-    #[arg(long, value_name = "GROUP")]
+    #[arg(long, value_name = "group 名称")]
     pub group: String,
 
     /// 记录标题
     #[arg(long, value_name = "文本")]
     pub title: Option<String>,
 
-    /// 设置一个已声明字段：`--set 字段=值`，可重复
+    /// 设置 kind 声明的字段：`--set 字段=值`，可重复
     #[arg(long = "set", value_name = "字段=值", value_parser = parse_assignment)]
     pub set: Vec<(String, String)>,
 
@@ -129,15 +130,15 @@ pub struct ShowArgs {
 #[derive(Debug, Args)]
 pub struct ListArgs {
     /// 只看某个 group
-    #[arg(long, value_name = "GROUP")]
+    #[arg(long, value_name = "group 名称")]
     pub group: Option<String>,
 
     /// 只看某个 kind
-    #[arg(long, value_name = "KIND")]
+    #[arg(long, value_name = "kind 名称")]
     pub kind: Option<String>,
 
-    /// 只看某个业务状态字段取值
-    #[arg(long, value_name = "值")]
+    /// 只看某个业务状态：判定键（todo/in_progress/blocked/done_unverified/done/none）或 kind 声明的原始取值
+    #[arg(long, value_name = "状态")]
     pub status: Option<String>,
 
     /// 包含已废弃记录
@@ -162,7 +163,7 @@ pub struct UpdateArgs {
     #[arg(value_name = "ID")]
     pub id: String,
 
-    /// 设置一个已声明字段：`--set 字段=值`，可重复
+    /// 设置 kind 声明的字段：`--set 字段=值`，可重复
     #[arg(long = "set", value_name = "字段=值", value_parser = parse_assignment)]
     pub set: Vec<(String, String)>,
 
@@ -171,7 +172,7 @@ pub struct UpdateArgs {
     pub unset: Vec<String>,
 
     /// 移动到另一个已声明的 group，ID 不变
-    #[arg(long, value_name = "GROUP")]
+    #[arg(long, value_name = "group 名称")]
     pub group: Option<String>,
 
     /// 替换一个正文分节：`--section 分节=内容`，可重复
@@ -273,14 +274,14 @@ pub enum KindCommand {
 #[derive(Debug, Args)]
 pub struct KindShowArgs {
     /// kind 名称；省略时列出全部声明
-    #[arg(value_name = "KIND")]
+    #[arg(value_name = "kind 名称")]
     pub name: Option<String>,
 }
 
 #[derive(Debug, Args)]
 pub struct KindCheckArgs {
     /// 只检查一个 kind；省略时检查全部
-    #[arg(value_name = "KIND")]
+    #[arg(value_name = "kind 名称")]
     pub name: Option<String>,
 }
 
@@ -315,4 +316,40 @@ fn parse_assignment(text: &str) -> Result<(String, String), String> {
         return Err(format!("expected a non-empty key in `{text}`"));
     }
     Ok((key.trim().to_string(), value.to_string()))
+}
+
+/// 构建帮助文案已本地化的命令树。
+///
+/// clap 内置的 help/version 选项与 `help` 子命令说明固定为英文，这里统一改成项目语言；
+/// 命令名、选项名与取值保持稳定，不随语言变化。
+///
+/// 这些内置参数由 clap 在构建命令树时补上，所以先 `build()` 再改写。
+#[must_use]
+pub fn localized_command() -> clap::Command {
+    let mut command = <Cli as clap::CommandFactory>::command();
+    command.build();
+    localize(command)
+}
+
+fn localize(command: clap::Command) -> clap::Command {
+    let mut command = command;
+    if command
+        .get_arguments()
+        .any(|arg| arg.get_id().as_str() == "help")
+    {
+        command = command.mut_arg("help", |arg| arg.help("打印帮助"));
+    }
+    if command
+        .get_arguments()
+        .any(|arg| arg.get_id().as_str() == "version")
+    {
+        command = command.mut_arg("version", |arg| arg.help("打印版本"));
+    }
+    if command
+        .get_subcommands()
+        .any(|sub| sub.get_name() == "help")
+    {
+        command = command.mut_subcommand("help", |sub| sub.about("打印帮助"));
+    }
+    command.mut_subcommands(localize)
 }
