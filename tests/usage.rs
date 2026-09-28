@@ -118,3 +118,42 @@ fn depends_on_takes_a_list_and_parent_stays_single() {
     ]);
     assert_eq!(code, 2, "`parent` takes a single record ID: {output}");
 }
+
+/// 读取端提前关闭管道时（`worklog show <ID> | head`），进程应当安静结束，
+/// 而不是让 `println!` 抛出 Rust panic。
+#[cfg(unix)]
+#[test]
+fn a_closed_pipe_ends_quietly_instead_of_panicking() {
+    use std::io::Read;
+    use std::process::Stdio;
+
+    let project = Project::new();
+    project.configure();
+    // 正文远大于管道缓冲区，保证读取端退出后写入必然失败。
+    let body = "x".repeat(256 * 1024);
+    project.write(
+        "worklog/items/WL-0001.md",
+        &format!(
+            "---\nid: WL-0001\nkind: project-note\ngroup: 研究\ntitle: 大记录\nphase: doing\n---\n\n## 目标\n\n{body}\n"
+        ),
+    );
+
+    let mut child = project
+        .command()
+        .args(["show", "WL-0001", "--color", "never"])
+        .stdout(Stdio::piped())
+        .stderr(Stdio::piped())
+        .spawn()
+        .expect("spawn the CLI");
+    let mut stdout = child.stdout.take().expect("capture stdout");
+    let mut head = [0_u8; 8];
+    stdout.read_exact(&mut head).expect("read the first bytes");
+    drop(stdout);
+
+    let output = child.wait_with_output().expect("wait for the CLI");
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        !stderr.contains("panicked"),
+        "a closed pipe must not panic: {stderr}"
+    );
+}

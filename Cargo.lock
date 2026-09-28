@@ -1064,6 +1064,7 @@ dependencies = [
  "chrono",
  "clap",
  "criterion",
+ "libc",
  "pulldown-cmark",
  "serde",
  "serde_json",
