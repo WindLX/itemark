@@ -3,7 +3,7 @@
 //! 每次查询都从当前记录、group、kind、生命周期与业务状态现场构建，不使用持久索引。
 //! 输出带上来源记录 ID 与生成时点；默认只读，仅显式选项才写入摘要快照。
 
-use crate::output::{labels, print_json};
+use crate::output::{fill, labels, print_json};
 use crate::record::Record;
 use crate::workspace::Workspace;
 
@@ -136,24 +136,22 @@ pub fn render_text(language: &str, overview: &Overview) -> String {
     let labels = labels(language);
     let mut out = String::new();
     out.push_str(labels.overview());
-    out.push_str(&format!(
-        "（{}：{}）\n",
-        labels.generated_at(),
-        overview.generated_at
+    out.push_str(&fill(
+        labels.counts_paren(),
+        &[labels.generated_at(), &overview.generated_at],
     ));
-    out.push_str(&format!(
-        "{}：{}  {}：{}  {}：{}  {}：{}  {}：{}\n",
-        labels.todo(),
-        overview.count_of(State::Todo),
-        labels.in_progress(),
-        overview.count_of(State::InProgress),
-        labels.blocked(),
-        overview.count_of(State::Blocked),
-        labels.unverified(),
-        overview.count_of(State::Unverified),
-        labels.done(),
-        overview.count_of(State::Done),
-    ));
+    let counts: Vec<String> = [
+        (labels.todo(), overview.count_of(State::Todo)),
+        (labels.in_progress(), overview.count_of(State::InProgress)),
+        (labels.blocked(), overview.count_of(State::Blocked)),
+        (labels.unverified(), overview.count_of(State::Unverified)),
+        (labels.done(), overview.count_of(State::Done)),
+    ]
+    .iter()
+    .map(|(label, count)| fill(labels.line(), &[label, &count.to_string()]))
+    .collect();
+    out.push_str(&counts.join("  "));
+    out.push('\n');
 
     for state in State::all() {
         let matching: Vec<&Entry> = overview
@@ -164,10 +162,9 @@ pub fn render_text(language: &str, overview: &Overview) -> String {
         if matching.is_empty() {
             continue;
         }
-        out.push_str(&format!(
-            "\n## {}（{}）\n",
-            state_label(&labels, state),
-            matching.len()
+        out.push_str(&fill(
+            labels.heading_count(),
+            &[state_label(&labels, state), &matching.len().to_string()],
         ));
         for entry in matching {
             out.push_str(&format!(
@@ -175,7 +172,7 @@ pub fn render_text(language: &str, overview: &Overview) -> String {
                 entry.id, entry.title, entry.kind, entry.group
             ));
             if let Some(step) = &entry.next_step {
-                out.push_str(&format!("  {}：{}\n", labels.next_step(), step));
+                out.push_str(&fill(labels.indented_line(), &[labels.next_step(), step]));
             }
         }
     }
@@ -186,20 +183,21 @@ pub fn render_text(language: &str, overview: &Overview) -> String {
         .filter(|entry| entry.dropped)
         .collect();
     if !dropped.is_empty() {
-        out.push_str(&format!(
-            "\n## {}（{}）\n",
-            labels.dropped_items(),
-            dropped.len()
+        out.push_str(&fill(
+            labels.heading_count(),
+            &[labels.dropped_items(), &dropped.len().to_string()],
         ));
         for entry in dropped {
             out.push_str(&format!("- {} {}\n", entry.id, entry.title));
         }
     }
 
-    out.push_str(&format!(
-        "\n{}：{}\n",
-        labels.sources(),
-        overview.source_ids().join("、")
+    out.push_str(&fill(
+        labels.source_line(),
+        &[
+            labels.sources(),
+            &overview.source_ids().join(labels.list_separator()),
+        ],
     ));
     out
 }
@@ -224,10 +222,9 @@ pub fn render_handoff(language: &str, overview: &Overview) -> String {
     let labels = labels(language);
     let mut out = String::new();
     out.push_str(labels.handoff_title());
-    out.push_str(&format!(
-        "（{}：{}）\n",
-        labels.generated_at(),
-        overview.generated_at
+    out.push_str(&fill(
+        labels.counts_paren(),
+        &[labels.generated_at(), &overview.generated_at],
     ));
 
     for state in handoff_states() {
@@ -236,10 +233,9 @@ pub fn render_handoff(language: &str, overview: &Overview) -> String {
             .iter()
             .filter(|entry| !entry.dropped && entry.state == state)
             .collect::<Vec<_>>();
-        out.push_str(&format!(
-            "\n## {}（{}）\n",
-            state_label(&labels, state),
-            matching.len()
+        out.push_str(&fill(
+            labels.heading_count(),
+            &[state_label(&labels, state), &matching.len().to_string()],
         ));
         if matching.is_empty() {
             out.push('\n');
@@ -250,33 +246,42 @@ pub fn render_handoff(language: &str, overview: &Overview) -> String {
                 "- {} {} · {} · {}\n",
                 entry.id, entry.title, entry.kind, entry.group
             ));
-            out.push_str(&format!(
-                "  {}：{}\n",
-                labels.next_step(),
-                entry.next_step.as_deref().unwrap_or("—")
+            out.push_str(&fill(
+                labels.indented_line(),
+                &[
+                    labels.next_step(),
+                    entry.next_step.as_deref().unwrap_or("—"),
+                ],
             ));
-            out.push_str(&format!("  {}：{}\n", labels.sources(), entry.id));
+            out.push_str(&fill(
+                labels.indented_line(),
+                &[labels.sources(), entry.id.as_str()],
+            ));
         }
     }
 
-    out.push_str(&format!(
-        "\n## {}（{}）\n",
-        labels.next_step(),
-        overview
-            .entries
-            .iter()
-            .filter(|entry| !entry.dropped && in_handoff(entry.state) && entry.next_step.is_some())
-            .count()
+    out.push_str(&fill(
+        labels.heading_count(),
+        &[
+            labels.next_step(),
+            &overview
+                .entries
+                .iter()
+                .filter(|entry| {
+                    !entry.dropped && in_handoff(entry.state) && entry.next_step.is_some()
+                })
+                .count()
+                .to_string(),
+        ],
     ));
     for entry in overview
         .entries
         .iter()
         .filter(|entry| !entry.dropped && in_handoff(entry.state) && entry.next_step.is_some())
     {
-        out.push_str(&format!(
-            "- {}：{}\n",
-            entry.id,
-            entry.next_step.as_deref().unwrap_or("")
+        out.push_str(&fill(
+            labels.issue_line(),
+            &[entry.id.as_str(), entry.next_step.as_deref().unwrap_or("")],
         ));
     }
     out

@@ -3,7 +3,7 @@
 use std::path::{Path, PathBuf};
 
 use crate::error::{Result, WorkspaceError};
-use crate::output::labels;
+use crate::output::{fill, labels};
 use crate::workspace::config::{Config, DEFAULT_LANGUAGE, DEFAULT_ROOT};
 
 use super::Context;
@@ -85,15 +85,21 @@ pub fn init(context: &Context, args: &InitArgs) -> Result<()> {
             .map_err(|error| WorkspaceError::from(error).at(&directory))?;
     }
 
+    let labels = labels(&config.language);
     println!(
-        "{} {}（root = {}）",
-        labels(&config.language).created(),
-        config_path.display(),
-        config.root.display()
+        "{}",
+        fill(
+            labels.init_line(),
+            &[
+                labels.created(),
+                &config_path.display().to_string(),
+                &config.root.display().to_string()
+            ]
+        )
     );
     println!(
-        "下一步：在 {} 中声明 kind 与 group",
-        crate::workspace::CONFIG_FILE
+        "{}",
+        fill(labels.next_step_hint(), &[crate::workspace::CONFIG_FILE])
     );
     Ok(())
 }

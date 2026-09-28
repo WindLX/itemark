@@ -6,7 +6,7 @@ use crate::checks::CheckReport;
 use crate::domain::Scalar;
 use crate::error::{Result, WorkspaceError};
 use crate::kind::{check_field_value, render_template, template_values};
-use crate::output::{OutputMode, labels, print_json};
+use crate::output::{Labels, OutputMode, fill, labels, print_json};
 use crate::record::Record;
 use crate::time;
 use crate::workspace::Config;
@@ -208,9 +208,10 @@ pub fn log(context: &Context, args: &LogArgs) -> Result<()> {
 
     workspace.transaction(|transaction| {
         let mut record = transaction.current(&args.id)?;
-        record
-            .body
-            .append_line(&args.section, &format!("- {date}：{}", args.text.trim()));
+        record.body.append_line(
+            &args.section,
+            &fill(labels(&language).log_note(), &[&date, args.text.trim()]),
+        );
         transaction.update(&args.id, Some(expected.as_str()), &record.render())?;
         Ok(())
     })?;
@@ -234,13 +235,14 @@ fn lifecycle(context: &Context, id: &str, dropped: bool, reason: Option<&str>) -
     let mut workspace = context.locked_workspace()?;
     let language = workspace.project_language(context.language.as_deref());
     let expected = workspace.index().require(id)?.raw.clone();
+    let labels = labels(&language);
     workspace.transaction(|transaction| {
         let mut record = transaction.current(id)?;
         record.set("dropped", Scalar::Bool(dropped));
         if let Some(reason) = reason {
             record.body.append_line(
                 "进展",
-                &format!("- {}：废弃（{}）", time::today(), reason.trim()),
+                &fill(labels.dropped_note(), &[&time::today(), reason.trim()]),
             );
         }
         transaction.update(id, Some(expected.as_str()), &record.render())?;
@@ -248,7 +250,6 @@ fn lifecycle(context: &Context, id: &str, dropped: bool, reason: Option<&str>) -
     })?;
     let record = workspace.index().require(id)?;
     if !context.mode.is_json() {
-        let labels = labels(&language);
         println!(
             "{} {} · {}",
             labels.updated(),
@@ -470,11 +471,23 @@ pub fn print_report(
         print_json(&report.to_json())?;
     } else {
         let labels = labels(language);
-        println!("{}：{}", scope.checked_label(&labels), report.checked);
+        println!(
+            "{}",
+            fill(
+                labels.line(),
+                &[scope.checked_label(&labels), &report.checked.to_string()]
+            )
+        );
         if report.is_ok() {
             println!("{}", labels.ok());
         } else {
-            println!("{}：{}", labels.issues(), report.issues.len());
+            println!(
+                "{}",
+                fill(
+                    labels.line(),
+                    &[labels.issues(), &report.issues.len().to_string()]
+                )
+            );
             for issue in &report.issues {
                 println!("- {issue}");
             }
@@ -542,6 +555,7 @@ fn scalar_json(value: &Scalar) -> serde_json::Value {
 
 /// 追加一行人读字段，并记下该键；同一键只打印一次。
 fn push_line(
+    labels: &Labels,
     out: &mut String,
     printed: &mut BTreeSet<String>,
     key: &str,
@@ -551,7 +565,7 @@ fn push_line(
     if !printed.insert(key.to_string()) {
         return;
     }
-    out.push_str(&format!("{label}：{value}\n"));
+    out.push_str(&fill(labels.record_line(), &[label, value]));
 }
 
 /// 一条记录的人读文本。
@@ -566,6 +580,7 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
     printed.insert("dropped".to_string());
 
     push_line(
+        &labels,
         &mut out,
         &mut printed,
         "id",
@@ -573,6 +588,7 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
         record.id().unwrap_or(""),
     );
     push_line(
+        &labels,
         &mut out,
         &mut printed,
         "kind",
@@ -580,6 +596,7 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
         record.kind().unwrap_or(""),
     );
     push_line(
+        &labels,
         &mut out,
         &mut printed,
         "group",
@@ -587,6 +604,7 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
         record.group(),
     );
     push_line(
+        &labels,
         &mut out,
         &mut printed,
         "title",
@@ -602,6 +620,7 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
             .and_then(crate::workspace::KindConfig::status_field)
             .unwrap_or("status");
         push_line(
+            &labels,
             &mut out,
             &mut printed,
             key,
@@ -610,19 +629,28 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
         );
     }
     if let Some(parent) = record.parent() {
-        push_line(&mut out, &mut printed, "parent", labels.parent(), &parent);
+        push_line(
+            &labels,
+            &mut out,
+            &mut printed,
+            "parent",
+            labels.parent(),
+            &parent,
+        );
     }
     let depends_on = record.depends_on();
     if !depends_on.is_empty() {
         push_line(
+            &labels,
             &mut out,
             &mut printed,
             "depends_on",
             labels.depends_on(),
-            &depends_on.join("、"),
+            &depends_on.join(labels.list_separator()),
         );
     }
     push_line(
+        &labels,
         &mut out,
         &mut printed,
         "lifecycle",
@@ -637,12 +665,20 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
             let value = record
                 .get(&field.name)
                 .map_or_else(String::new, Scalar::display);
-            push_line(&mut out, &mut printed, &field.name, &field.name, &value);
+            push_line(
+                &labels,
+                &mut out,
+                &mut printed,
+                &field.name,
+                &field.name,
+                &value,
+            );
         }
     }
     let note = record.completion_note();
     if !note.trim().is_empty() {
         push_line(
+            &labels,
             &mut out,
             &mut printed,
             "completion_note",
@@ -653,6 +689,7 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
     let evidence = record.completion_evidence();
     if !evidence.trim().is_empty() {
         push_line(
+            &labels,
             &mut out,
             &mut printed,
             "completion_evidence",
@@ -662,10 +699,20 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
     }
     // 头部里剩下、前面没有专门打印的字段按原始键输出。
     for (key, value) in &record.fields {
-        push_line(&mut out, &mut printed, key, key, &Scalar::display(value));
+        push_line(
+            &labels,
+            &mut out,
+            &mut printed,
+            key,
+            key,
+            &Scalar::display(value),
+        );
     }
 
-    out.push_str(&format!("\n{}：\n{}", labels.body(), record.body.render()));
+    out.push_str(&fill(
+        labels.body_block(),
+        &[labels.body(), record.body.render().trim()],
+    ));
     out
 }
 

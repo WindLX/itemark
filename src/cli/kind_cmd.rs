@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 use crate::checks::{CheckReport, Issue, IssueKind};
 use crate::error::Result;
 use crate::kind::template_body;
-use crate::output::{labels, print_json};
+use crate::output::{fill, labels, print_json};
 use crate::record::markdown::BodyDoc;
 use crate::workspace::config::KindConfig;
 
@@ -28,11 +28,26 @@ pub fn list(context: &Context) -> Result<()> {
         return Ok(());
     }
     let labels = labels(&language);
-    println!("{}：{}", labels.kinds(), config.kinds.len());
+    println!(
+        "{}",
+        fill(
+            labels.line(),
+            &[labels.kinds(), &config.kinds.len().to_string()]
+        )
+    );
     for kind in &config.kinds {
-        println!("- {}（{} 个字段）", kind.name, kind.fields.len());
+        println!(
+            "{}",
+            fill(
+                labels.kind_summary(),
+                &[&kind.name, &kind.fields.len().to_string()]
+            )
+        );
         if !kind.description.is_empty() {
-            println!("  {}：{}", labels.description(), kind.description);
+            println!(
+                "  {}",
+                fill(labels.line(), &[labels.description(), &kind.description])
+            );
         }
     }
     Ok(())
@@ -61,31 +76,58 @@ pub fn show(context: &Context, args: &KindShowArgs) -> Result<()> {
 
     let labels = labels(&language);
     for kind in kinds {
-        println!("{}：{}", labels.kind(), kind.name);
+        println!("{}", fill(labels.line(), &[labels.kind(), &kind.name]));
         if !kind.description.is_empty() {
-            println!("{}：{}", labels.description(), kind.description);
+            println!(
+                "{}",
+                fill(labels.line(), &[labels.description(), &kind.description])
+            );
         }
         if let Some(path) = config.template_path(kind) {
+            let presence = if path.is_file() {
+                labels.present()
+            } else {
+                labels.missing()
+            };
             println!(
-                "{}：{}（{}）",
-                labels.template(),
-                path.display(),
-                if path.is_file() { "存在" } else { "缺失" }
+                "{}",
+                fill(
+                    labels.template_line(),
+                    &[labels.template(), &path.display().to_string(), presence]
+                )
             );
         }
         if !kind.required_sections.is_empty() {
             println!(
-                "{}：{}",
-                labels.required_sections(),
-                kind.required_sections.join("、")
+                "{}",
+                fill(
+                    labels.line(),
+                    &[
+                        labels.required_sections(),
+                        &kind.required_sections.join(labels.list_separator())
+                    ]
+                )
             );
         }
         if let Some((field, values)) = kind.completion_rule() {
-            println!("{}：{} = {}", labels.completion(), field, values.join("|"));
+            println!(
+                "{}",
+                fill(
+                    labels.line(),
+                    &[
+                        labels.completion(),
+                        &format!("{field} = {}", values.join("|"))
+                    ]
+                )
+            );
         }
-        println!("{}：", labels.fields());
+        println!("{}", fill(labels.heading(), &[labels.fields()]));
         for field in &kind.fields {
-            let required = if field.required { "（必填）" } else { "" };
+            let required = if field.required {
+                labels.required_marker()
+            } else {
+                ""
+            };
             let values = if field.values.is_empty() {
                 String::new()
             } else {
@@ -97,7 +139,10 @@ pub fn show(context: &Context, args: &KindShowArgs) -> Result<()> {
             );
         }
         if let Ok(Some(body)) = template_body(config, kind) {
-            println!("\n{}：\n{}", labels.body(), body.render().trim());
+            println!(
+                "{}",
+                fill(labels.body_block(), &[labels.body(), body.render().trim()])
+            );
         }
     }
     Ok(())

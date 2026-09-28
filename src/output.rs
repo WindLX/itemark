@@ -89,6 +89,48 @@ labels! {
     saved => "已保存", "saved";
     updated => "已更新", "updated";
     created => "已创建", "created";
+    init_line => "{} {}（root = {}）", "{} {} (root = {})";
+    next_step_hint => "下一步：在 {} 中声明 kind 与 group", "Next: declare kinds and groups in {}";
+    kind_summary => "- {}（{} 个字段）", "- {} ({} fields)";
+    group_summary => "- {}（{} 条记录）", "- {} ({} records)";
+    template_line => "{}：{}（{}）", "{}: {} ({})";
+    present => "存在", "present";
+    missing => "缺失", "missing";
+    required_marker => "（必填）", " (required)";
+    list_separator => "、", ", ";
+    dropped_note => "- {}：废弃（{}）", "- {}: dropped ({})";
+    line => "{}：{}", "{}: {}";
+    heading => "{}：", "{}:";
+    record_line => "{}：{}\n", "{}: {}\n";
+    log_note => "- {}：{}", "- {}: {}";
+    body_block => "\n{}：\n{}", "\n{}:\n{}";
+    heading_count => "\n## {}（{}）\n", "\n## {} ({})\n";
+    counts_paren => "（{}：{}）\n", "({}: {})\n";
+    indented_line => "  {}：{}\n", "  {}: {}\n";
+    source_line => "\n{}：{}\n", "\n{}: {}\n";
+    issue_line => "- {}：{}\n", "- {}: {}\n";
+    group_created => "{} group {}（{}）", "{} group {} ({})";
+}
+
+/// 用语言相关的句子模板渲染人读文本：模板里的 `{}` 按顺序被 `parts` 填充。
+///
+/// 模板来自 [`Labels`]，所以一句完整的话只有一处定义；命令实现不再自己拼接面向使用者的
+/// 中文句子。
+#[must_use]
+pub fn fill(template: &str, parts: &[&str]) -> String {
+    let mut rendered = String::with_capacity(template.len() + 16);
+    let mut rest = template;
+    let mut parts = parts.iter();
+    while let Some(index) = rest.find("{}") {
+        rendered.push_str(&rest[..index]);
+        match parts.next() {
+            Some(part) => rendered.push_str(part),
+            None => rendered.push_str("{}"),
+        }
+        rest = &rest[index + 2..];
+    }
+    rendered.push_str(rest);
+    rendered
 }
 
 #[must_use]

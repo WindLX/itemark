@@ -1,7 +1,7 @@
 //! `group list/add/show`。
 
 use crate::error::{Result, WorkspaceError};
-use crate::output::{labels, print_json};
+use crate::output::{fill, labels, print_json};
 use crate::workspace::config::CONFIG_FILE;
 
 use super::Context;
@@ -37,10 +37,19 @@ pub fn list(context: &Context) -> Result<()> {
         return Ok(());
     }
     let labels = labels(&language);
-    println!("{}：{}", labels.groups(), config.groups.len());
+    println!(
+        "{}",
+        fill(
+            labels.line(),
+            &[labels.groups(), &config.groups.len().to_string()]
+        )
+    );
     for group in &config.groups {
         let records = workspace.index().by_group(group);
-        println!("- {group}（{} 条记录）", records.len());
+        println!(
+            "{}",
+            fill(labels.group_summary(), &[group, &records.len().to_string()])
+        );
     }
     Ok(())
 }
@@ -83,11 +92,17 @@ pub fn add(context: &Context, args: &GroupAddArgs) -> Result<()> {
         }))?;
         return Ok(());
     }
+    let labels = labels(&language);
     println!(
-        "{} group {}（{}）",
-        labels(&language).created(),
-        args.name,
-        config.config_path.display()
+        "{}",
+        fill(
+            labels.group_created(),
+            &[
+                labels.created(),
+                &args.name,
+                &config.config_path.display().to_string()
+            ]
+        )
     );
     Ok(())
 }
@@ -128,10 +143,19 @@ pub fn show(context: &Context, args: &GroupShowArgs) -> Result<()> {
         return Ok(());
     }
     let labels = labels(&language);
-    println!("{}：{}", labels.group(), args.name);
-    println!("{}：{}", labels.items(), records.len());
+    println!("{}", fill(labels.line(), &[labels.group(), &args.name]));
+    println!(
+        "{}",
+        fill(labels.line(), &[labels.items(), &records.len().to_string()])
+    );
     if !kinds.is_empty() {
-        println!("{}：{}", labels.kinds(), kinds.join("、"));
+        println!(
+            "{}",
+            fill(
+                labels.line(),
+                &[labels.kinds(), &kinds.join(labels.list_separator())]
+            )
+        );
     }
     for record in records {
         println!(
