@@ -431,13 +431,46 @@ pub fn print_records(
     Ok(())
 }
 
+/// 检查来自哪条命令：决定人读的计数标签与失败时的错误前缀。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum ReportScope {
+    /// `check`：检查记录。
+    Records,
+    /// `kind check`：检查 kind 自身的声明。
+    Kinds,
+}
+
+impl ReportScope {
+    fn command(self) -> &'static str {
+        match self {
+            Self::Records => "worklog check",
+            Self::Kinds => "kind check",
+        }
+    }
+
+    fn checked_label(self, labels: &crate::output::Labels) -> &'static str {
+        match self {
+            Self::Records => labels.checked(),
+            Self::Kinds => labels.checked_kinds(),
+        }
+    }
+}
+
 /// 呈现检查报告；有问题时返回非零退出状态。
-pub fn print_report(mode: OutputMode, language: &str, report: &CheckReport) -> Result<()> {
+///
+/// 记录检查与 `kind check` 共用同一份发现结构（[`crate::checks::CheckReport`]），
+/// 因此文本与 JSON 只有一处渲染。
+pub fn print_report(
+    mode: OutputMode,
+    language: &str,
+    scope: ReportScope,
+    report: &CheckReport,
+) -> Result<()> {
     if mode.is_json() {
         print_json(&report.to_json())?;
     } else {
         let labels = labels(language);
-        println!("{}：{}", labels.checked(), report.checked);
+        println!("{}：{}", scope.checked_label(&labels), report.checked);
         if report.is_ok() {
             println!("{}", labels.ok());
         } else {
@@ -451,7 +484,8 @@ pub fn print_report(mode: OutputMode, language: &str, report: &CheckReport) -> R
         Ok(())
     } else {
         Err(WorkspaceError::runtime(format!(
-            "worklog check found {} issue(s)",
+            "{} found {} issue(s)",
+            scope.command(),
             report.issues.len()
         )))
     }

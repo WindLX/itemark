@@ -73,6 +73,58 @@ pub fn template_body(config: &Config, kind: &KindConfig) -> Result<Option<BodyDo
     Ok(Some(BodyDoc::parse(&body)))
 }
 
+/// 字段类型的唯一词表。
+///
+/// 声明校验（配置加载）、取值校验（写入与 `check`）与 `kind check` 都从这里取，
+/// 新增或修改一种类型只改这个模块。
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum FieldType {
+    String,
+    Int,
+    Bool,
+    Enum,
+    Date,
+}
+
+impl FieldType {
+    /// 全部可用类型，顺序即错误信息里的呈现顺序。
+    pub const ALL: [Self; 5] = [Self::String, Self::Int, Self::Bool, Self::Enum, Self::Date];
+
+    #[must_use]
+    pub fn parse(name: &str) -> Option<Self> {
+        Self::ALL
+            .into_iter()
+            .find(|candidate| candidate.as_str() == name)
+    }
+
+    #[must_use]
+    pub fn as_str(self) -> &'static str {
+        match self {
+            Self::String => "string",
+            Self::Int => "int",
+            Self::Bool => "bool",
+            Self::Enum => "enum",
+            Self::Date => "date",
+        }
+    }
+
+    /// 只有 `enum` 用 `values` 声明允许取值，其他类型声明 `values` 是配置错误。
+    #[must_use]
+    pub fn takes_values(self) -> bool {
+        self == Self::Enum
+    }
+
+    /// 供错误信息使用的类型清单。
+    #[must_use]
+    pub fn available() -> String {
+        Self::ALL
+            .iter()
+            .map(|field_type| field_type.as_str())
+            .collect::<Vec<_>>()
+            .join(", ")
+    }
+}
+
 /// 按字段类型与枚举取值校验字段值；空值由调用方按 required 处理。
 pub fn check_field_value(kind: &KindConfig, field: &FieldDef, value: &str) -> Result<()> {
     let value = value.trim();
@@ -82,34 +134,36 @@ pub fn check_field_value(kind: &KindConfig, field: &FieldDef, value: &str) -> Re
             kind.name, field.name
         ))
     };
-    match field.field_type.as_str() {
-        "string" => Ok(()),
-        "date" => {
+    let Some(field_type) = FieldType::parse(&field.field_type) else {
+        return Err(WorkspaceError::usage(format!(
+            "kind `{}` field `{}` has unsupported type `{}`",
+            kind.name, field.name, field.field_type
+        )));
+    };
+    match field_type {
+        FieldType::String => Ok(()),
+        FieldType::Date => {
             if is_iso_date(value) {
                 Ok(())
             } else {
                 Err(invalid("a real YYYY-MM-DD date"))
             }
         }
-        "int" => value
+        FieldType::Int => value
             .parse::<i64>()
             .map(|_| ())
             .map_err(|_| invalid("an integer")),
-        "bool" => match value {
+        FieldType::Bool => match value {
             "true" | "false" => Ok(()),
             _ => Err(invalid("true or false")),
         },
-        "enum" => {
+        FieldType::Enum => {
             if field.values.iter().any(|allowed| allowed == value) {
                 Ok(())
             } else {
                 Err(invalid(&format!("one of {}", field.values.join(", "))))
             }
         }
-        other => Err(WorkspaceError::usage(format!(
-            "kind `{}` field `{}` has unsupported type `{other}`",
-            kind.name, field.name
-        ))),
     }
 }
 

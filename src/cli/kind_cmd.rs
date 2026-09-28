@@ -2,14 +2,16 @@
 
 use std::collections::BTreeSet;
 
-use crate::error::{Result, WorkspaceError};
-use crate::kind::{is_iso_date, template_body};
+use crate::checks::{CheckReport, Issue, IssueKind};
+use crate::error::Result;
+use crate::kind::template_body;
 use crate::output::{labels, print_json};
 use crate::record::markdown::BodyDoc;
 use crate::workspace::config::KindConfig;
 
 use super::Context;
 use super::args::{KindCheckArgs, KindShowArgs};
+use super::item;
 
 pub fn list(context: &Context) -> Result<()> {
     let workspace = context.workspace()?;
@@ -111,66 +113,56 @@ pub fn check(context: &Context, args: &KindCheckArgs) -> Result<()> {
         None => config.kinds.iter().collect(),
     };
 
-    let mut issues: Vec<serde_json::Value> = Vec::new();
-    let mut checked = 0;
+    // 发现与记录检查同构：同一份 CheckReport，同一处渲染。
+    let mut report = CheckReport {
+        issues: Vec::new(),
+        checked: 0,
+    };
     for kind in kinds {
-        checked += 1;
-        let mut report = |detail: String| {
-            issues.push(serde_json::json!({
-                "type": "kind_declaration",
-                "target": kind.name,
-                "detail": detail,
-            }));
+        report.checked += 1;
+        let mut record_issue = |detail: String| {
+            report.issues.push(Issue {
+                kind: IssueKind::KindDeclaration,
+                target: kind.name.clone(),
+                detail,
+            });
         };
 
         let completion_field = kind.completion_field.clone();
         let completion_values = kind.completion_values.clone();
         if let Some(field) = completion_field.as_deref() {
             match kind.field(field) {
-                None => report(format!(
+                None => record_issue(format!(
                     "completion_field `{field}` is not a declared field"
                 )),
                 Some(declared) => {
                     for value in &completion_values {
                         if let Err(error) = crate::kind::check_field_value(kind, declared, value) {
-                            report(error.message().to_string());
+                            record_issue(error.message().to_string());
                         }
                     }
                 }
             }
         }
-        for field in &kind.fields {
-            if field.field_type == "date" {
-                for value in &field.values {
-                    if !is_iso_date(value) {
-                        report(format!(
-                            "field `{}` declares a non-ISO date value `{value}`",
-                            field.name
-                        ));
-                    }
-                }
-            }
-        }
-
         let Some(path) = config.template_path(kind) else {
             continue;
         };
         if !path.is_file() {
-            report(format!("template is missing: {}", path.display()));
+            record_issue(format!("template is missing: {}", path.display()));
             continue;
         }
         let body: BodyDoc = match template_body(config, kind) {
             Ok(Some(body)) => body,
             Ok(None) => BodyDoc::parse(""),
             Err(error) => {
-                report(error.message().to_string());
+                record_issue(error.message().to_string());
                 continue;
             }
         };
         let titles: BTreeSet<String> = body.titles().into_iter().collect();
         for section in &kind.required_sections {
             if !titles.contains(section) {
-                report(format!(
+                record_issue(format!(
                     "template `{}` has no section `{section}`",
                     path.display()
                 ));
@@ -178,35 +170,7 @@ pub fn check(context: &Context, args: &KindCheckArgs) -> Result<()> {
         }
     }
 
-    let ok = issues.is_empty();
-    if context.mode.is_json() {
-        print_json(&serde_json::json!({
-            "checked": checked,
-            "ok": ok,
-            "issues": issues,
-        }))?;
-    } else {
-        let labels = labels(&language);
-        println!("{}：{checked}", labels.checked_kinds());
-        if ok {
-            println!("{}", labels.ok());
-        } else {
-            println!("{}：{}", labels.issues(), issues.len());
-            for issue in &issues {
-                let target = issue["target"].as_str().unwrap_or("");
-                let detail = issue["detail"].as_str().unwrap_or("");
-                println!("- {target}: {detail}");
-            }
-        }
-    }
-    if ok {
-        Ok(())
-    } else {
-        Err(WorkspaceError::runtime(format!(
-            "kind check found {} issue(s)",
-            issues.len()
-        )))
-    }
+    item::print_report(context.mode, &language, item::ReportScope::Kinds, &report)
 }
 
 fn kind_json(config: &crate::workspace::Config, kind: &KindConfig) -> serde_json::Value {

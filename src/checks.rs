@@ -21,6 +21,8 @@ pub enum IssueKind {
     UnknownGroup,
     BrokenReference,
     CompletionEvidence,
+    /// kind 自身声明的问题（`kind check`），例如完成字段指向未声明的字段。
+    KindDeclaration,
 }
 
 impl IssueKind {
@@ -35,6 +37,7 @@ impl IssueKind {
             Self::UnknownGroup => "unknown_group",
             Self::BrokenReference => "broken_reference",
             Self::CompletionEvidence => "completion_evidence",
+            Self::KindDeclaration => "kind_declaration",
         }
     }
 }

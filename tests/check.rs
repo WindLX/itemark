@@ -133,3 +133,70 @@ fields = [
     assert_eq!(code, 1, "a declared required field is reported: {output}");
     assert!(output.contains("title"), "{output}");
 }
+
+#[test]
+fn kind_check_uses_the_same_report_as_check() {
+    let project = Project::new();
+    project.write(
+        "worklog.toml",
+        r#"
+language = "zh-CN"
+root = "worklog"
+
+[[groups]]
+name = "研究"
+
+[[kinds]]
+name = "work"
+description = "完成值不在字段声明允许的取值内"
+template = "templates/work.md"
+required_sections = ["目标"]
+completion_field = "status"
+completion_values = ["finished"]
+fields = [
+  { name = "title", type = "string" },
+  { name = "status", type = "enum", values = ["todo", "done"] },
+]
+"#,
+    );
+    project.write(
+        "worklog/templates/work.md",
+        "---\nid: \"{{id}}\"\nkind: \"work\"\ngroup: \"{{group}}\"\ntitle: \"{{title}}\"\nstatus: \"todo\"\n---\n## 目标\n\n",
+    );
+
+    // JSON 报告走 stdout，失败原因走 stderr，因此直接看进程输出。
+    let output = project.run(&["kind", "check", "--json"]);
+    assert_eq!(output.status.code(), Some(1), "{output:?}");
+    assert!(
+        !output.stderr.is_empty(),
+        "a failing check explains itself on stderr"
+    );
+    let stdout = String::from_utf8(output.stdout).expect("stdout is UTF-8");
+    let json: serde_json::Value =
+        serde_json::from_str(&stdout).expect("kind check emits JSON when asked for it");
+    assert_eq!(json["ok"], serde_json::json!(false), "{stdout}");
+    assert_eq!(json["checked"], serde_json::json!(1), "{stdout}");
+    assert_eq!(json["issues"][0]["type"], "kind_declaration", "{stdout}");
+    assert_eq!(json["issues"][0]["target"], "work", "{stdout}");
+    assert!(
+        json["issues"][0]["detail"]
+            .as_str()
+            .unwrap_or_default()
+            .contains("finished"),
+        "{stdout}"
+    );
+
+    // 记录检查与 kind 检查共用同一份报告结构，键集合必须一致。
+    let check_output = project.ok(&["check", "--json"]);
+    let check_json: serde_json::Value =
+        serde_json::from_str(&check_output).expect("check emits JSON when asked for it");
+    let keys = |value: &serde_json::Value| -> Vec<String> {
+        value
+            .as_object()
+            .expect("report is an object")
+            .keys()
+            .cloned()
+            .collect()
+    };
+    assert_eq!(keys(&json), keys(&check_json), "{check_output}");
+}

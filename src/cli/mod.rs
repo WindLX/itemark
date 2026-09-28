@@ -142,7 +142,7 @@ fn check(context: &Context, args: &args::CheckArgs) -> Result<()> {
         }
         None => crate::checks::check_all(&workspace),
     };
-    item::print_report(context.mode, &language, &report)
+    item::print_report(context.mode, &language, item::ReportScope::Records, &report)
 }
 
 /// 已声明 group 的人读清单，供用法错误信息使用。

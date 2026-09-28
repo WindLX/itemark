@@ -272,25 +272,24 @@ fn validate_field(
     field: &FieldDef,
     config_path: &Path,
 ) -> Result<(), WorkspaceError> {
-    let known = ["string", "int", "bool", "enum", "date"];
-    if !known.contains(&field.field_type.as_str()) {
+    let Some(field_type) = crate::kind::FieldType::parse(&field.field_type) else {
         return Err(WorkspaceError::runtime(format!(
             "kind `{}` field `{}` uses unsupported type `{}`; available: {}",
             kind.name,
             field.name,
             field.field_type,
-            known.join(", ")
+            crate::kind::FieldType::available()
         ))
         .at(config_path));
-    }
-    if field.field_type == "enum" && field.values.is_empty() {
+    };
+    if field_type.takes_values() && field.values.is_empty() {
         return Err(WorkspaceError::runtime(format!(
             "kind `{}` enum field `{}` declares no values",
             kind.name, field.name
         ))
         .at(config_path));
     }
-    if field.field_type != "enum" && !field.values.is_empty() {
+    if !field_type.takes_values() && !field.values.is_empty() {
         return Err(WorkspaceError::runtime(format!(
             "kind `{}` field `{}` is not an enum but declares values",
             kind.name, field.name
