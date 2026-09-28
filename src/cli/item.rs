@@ -241,7 +241,7 @@ fn lifecycle(context: &Context, id: &str, dropped: bool, reason: Option<&str>) -
         record.set("dropped", Scalar::Bool(dropped));
         if let Some(reason) = reason {
             record.body.append_line(
-                "进展",
+                crate::domain::section::PROGRESS,
                 &fill(labels.dropped_note(), &[&time::today(), reason.trim()]),
             );
         }

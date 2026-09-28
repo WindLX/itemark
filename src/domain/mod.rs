@@ -3,6 +3,7 @@
 pub mod front_matter;
 pub mod id;
 pub mod scalar;
+pub mod section;
 
 pub use id::{ID_PREFIX, Lifecycle, format_id, id_number};
 pub use scalar::Scalar;

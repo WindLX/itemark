@@ -115,8 +115,8 @@ fn entry_of(config: &crate::workspace::Config, record: &Record) -> Option<Entry>
 
 /// 记录的「下一步」：优先取 kind 或记录中的下一步分节，其次取最后一条进展。
 fn next_step_of(record: &Record) -> Option<String> {
-    for section in ["下一步", "当前下一步"] {
-        if let Some(found) = record.body.section(section)
+    for name in crate::domain::section::NEXT_STEP {
+        if let Some(found) = record.body.section(name)
             && !found.body.trim().is_empty()
         {
             return Some(found.body.trim().to_string());
@@ -124,7 +124,7 @@ fn next_step_of(record: &Record) -> Option<String> {
     }
     record
         .body
-        .section("进展")
+        .section(crate::domain::section::PROGRESS)
         .and_then(|section| section.body.lines().next_back())
         .map(|line| line.trim().to_string())
         .filter(|line| !line.is_empty())

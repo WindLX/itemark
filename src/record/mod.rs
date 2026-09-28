@@ -8,14 +8,10 @@ pub mod markdown;
 
 use std::path::{Path, PathBuf};
 
-use crate::domain::{Field, Lifecycle, Scalar, front_matter};
+use crate::domain::{Field, Lifecycle, Scalar, front_matter, section};
 use crate::error::{Result, WorkspaceError, read_error};
 
 pub use markdown::BodyDoc;
-
-/// 记录默认使用的分节标题；kind 可以先声明自己的必填分节。
-pub const DEFAULT_COMPLETION_SECTION: &str = "完成说明";
-pub const DEFAULT_EVIDENCE_SECTION: &str = "证据";
 
 /// 已从磁盘加载的记录。
 #[derive(Debug, Clone)]
@@ -124,7 +120,7 @@ impl Record {
             .filter(|text| !text.trim().is_empty())
             .or_else(|| {
                 self.body
-                    .section(DEFAULT_COMPLETION_SECTION)
+                    .section(section::COMPLETION)
                     .map(|section| section.body.clone())
             })
             .unwrap_or_default()
@@ -139,7 +135,7 @@ impl Record {
             .filter(|text| !text.trim().is_empty())
             .or_else(|| {
                 self.body
-                    .section(DEFAULT_EVIDENCE_SECTION)
+                    .section(section::EVIDENCE)
                     .map(|section| section.body.clone())
             })
             .unwrap_or_default()

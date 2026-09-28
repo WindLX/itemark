@@ -7,6 +7,8 @@ use std::path::PathBuf;
 
 use clap::{Args, Parser, Subcommand};
 
+use crate::domain::section::PROGRESS;
+
 #[derive(Debug, Parser)]
 #[command(
     name = "worklog",
@@ -184,7 +186,7 @@ pub struct LogArgs {
     pub date: Option<String>,
 
     /// 写入的正文分节，默认「进展」
-    #[arg(long, value_name = "分节", default_value = "进展")]
+    #[arg(long, value_name = "分节", default_value = PROGRESS)]
     pub section: String,
 }
 
