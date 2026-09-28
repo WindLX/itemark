@@ -2,6 +2,7 @@
 
 use crate::error::{Result, WorkspaceError};
 use crate::output::{fill, labels, print_json};
+use crate::style::{self, paint};
 use crate::workspace::config::CONFIG_FILE;
 
 use super::Context;
@@ -41,14 +42,20 @@ pub fn list(context: &Context) -> Result<()> {
         "{}",
         fill(
             labels.line(),
-            &[labels.groups(), &config.groups.len().to_string()]
+            &[
+                &paint(style::heading(), labels.groups()),
+                &paint(style::accent(), &config.groups.len().to_string()),
+            ]
         )
     );
     for group in &config.groups {
         let records = workspace.index().by_group(group);
         println!(
             "{}",
-            fill(labels.group_summary(), &[group, &records.len().to_string()])
+            fill(
+                labels.group_summary(),
+                &[&paint(style::accent(), group), &records.len().to_string(),]
+            )
         );
     }
     Ok(())
@@ -98,9 +105,9 @@ pub fn add(context: &Context, args: &GroupAddArgs) -> Result<()> {
         fill(
             labels.group_created(),
             &[
-                labels.created(),
-                &args.name,
-                &config.config_path.display().to_string()
+                &paint(style::ok(), labels.created()),
+                &paint(style::accent(), &args.name),
+                &paint(style::muted(), &config.config_path.display().to_string())
             ]
         )
     );
@@ -143,10 +150,25 @@ pub fn show(context: &Context, args: &GroupShowArgs) -> Result<()> {
         return Ok(());
     }
     let labels = labels(&language);
-    println!("{}", fill(labels.line(), &[labels.group(), &args.name]));
     println!(
         "{}",
-        fill(labels.line(), &[labels.items(), &records.len().to_string()])
+        fill(
+            labels.line(),
+            &[
+                &paint(style::heading(), labels.group()),
+                &paint(style::accent(), &args.name)
+            ]
+        )
+    );
+    println!(
+        "{}",
+        fill(
+            labels.line(),
+            &[
+                &paint(style::label(), labels.items()),
+                &records.len().to_string()
+            ]
+        )
     );
     if !kinds.is_empty() {
         println!(

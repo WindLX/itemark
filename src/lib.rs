@@ -17,6 +17,7 @@ pub mod kind;
 pub mod output;
 pub mod record;
 pub mod status;
+pub mod style;
 pub mod time;
 pub mod view;
 pub mod workspace;

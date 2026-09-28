@@ -7,6 +7,7 @@ use crate::error::Result;
 use crate::kind::template_body;
 use crate::output::{fill, labels, print_json};
 use crate::record::markdown::BodyDoc;
+use crate::style::{self, paint};
 use crate::workspace::config::KindConfig;
 
 use super::Context;
@@ -32,7 +33,10 @@ pub fn list(context: &Context) -> Result<()> {
         "{}",
         fill(
             labels.line(),
-            &[labels.kinds(), &config.kinds.len().to_string()]
+            &[
+                &paint(style::heading(), labels.kinds()),
+                &paint(style::accent(), &config.kinds.len().to_string()),
+            ]
         )
     );
     for kind in &config.kinds {
@@ -40,7 +44,10 @@ pub fn list(context: &Context) -> Result<()> {
             "{}",
             fill(
                 labels.kind_summary(),
-                &[&kind.name, &kind.fields.len().to_string()]
+                &[
+                    &paint(style::accent(), &kind.name),
+                    &kind.fields.len().to_string()
+                ]
             )
         );
         if !kind.description.is_empty() {
@@ -76,7 +83,16 @@ pub fn show(context: &Context, args: &KindShowArgs) -> Result<()> {
 
     let labels = labels(&language);
     for kind in kinds {
-        println!("{}", fill(labels.line(), &[labels.kind(), &kind.name]));
+        println!(
+            "{}",
+            fill(
+                labels.line(),
+                &[
+                    &paint(style::heading(), labels.kind()),
+                    &paint(style::accent(), &kind.name)
+                ]
+            )
+        );
         if !kind.description.is_empty() {
             println!(
                 "{}",
@@ -85,15 +101,19 @@ pub fn show(context: &Context, args: &KindShowArgs) -> Result<()> {
         }
         if let Some(path) = config.template_path(kind) {
             let presence = if path.is_file() {
-                labels.present()
+                paint(style::ok(), labels.present())
             } else {
-                labels.missing()
+                paint(style::warn(), labels.missing())
             };
             println!(
                 "{}",
                 fill(
                     labels.template_line(),
-                    &[labels.template(), &path.display().to_string(), presence]
+                    &[
+                        labels.template(),
+                        &path.display().to_string(),
+                        presence.as_str()
+                    ]
                 )
             );
         }
@@ -121,7 +141,13 @@ pub fn show(context: &Context, args: &KindShowArgs) -> Result<()> {
                 )
             );
         }
-        println!("{}", fill(labels.heading(), &[labels.fields()]));
+        println!(
+            "{}",
+            fill(
+                labels.heading(),
+                &[&paint(style::heading(), labels.fields())]
+            )
+        );
         for field in &kind.fields {
             let required = if field.required {
                 labels.required_marker()

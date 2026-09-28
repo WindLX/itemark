@@ -3,11 +3,12 @@
 use clap::Parser;
 
 use worklog::cli::args::Cli;
+use worklog::style;
 
 fn main() {
     let cli = Cli::parse();
     if let Err(error) = worklog::cli::run(cli) {
-        eprintln!("{error}");
+        eprintln!("{}", style::paint(style::error(), &error.to_string()));
         std::process::exit(error.exit_code());
     }
 }

@@ -4,6 +4,7 @@ use std::path::{Path, PathBuf};
 
 use crate::error::{Result, WorkspaceError};
 use crate::output::{fill, labels};
+use crate::style::{self, paint};
 use crate::workspace::config::{Config, DEFAULT_LANGUAGE, DEFAULT_ROOT};
 
 use super::Context;
@@ -91,8 +92,8 @@ pub fn init(context: &Context, args: &InitArgs) -> Result<()> {
         fill(
             labels.init_line(),
             &[
-                labels.created(),
-                &config_path.display().to_string(),
+                &paint(style::ok(), labels.created()),
+                &paint(style::muted(), &config_path.display().to_string()),
                 &config.root.display().to_string()
             ]
         )

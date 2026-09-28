@@ -5,6 +5,7 @@
 
 use crate::output::{fill, labels, print_json};
 use crate::record::Record;
+use crate::style::paint;
 use crate::workspace::Workspace;
 
 /// 记录的业务状态来自 [`crate::status::of`]，总览只做分组呈现。
@@ -135,7 +136,7 @@ fn next_step_of(record: &Record) -> Option<String> {
 pub fn render_text(language: &str, overview: &Overview) -> String {
     let labels = labels(language);
     let mut out = String::new();
-    out.push_str(labels.overview());
+    out.push_str(&paint(crate::style::heading(), labels.overview()));
     out.push_str(&fill(
         labels.counts_paren(),
         &[labels.generated_at(), &overview.generated_at],
@@ -164,12 +165,18 @@ pub fn render_text(language: &str, overview: &Overview) -> String {
         }
         out.push_str(&fill(
             labels.heading_count(),
-            &[state_label(&labels, state), &matching.len().to_string()],
+            &[
+                &paint(crate::style::heading(), state_label(&labels, state)),
+                &matching.len().to_string(),
+            ],
         ));
         for entry in matching {
             out.push_str(&format!(
                 "- {} {} · {} · {}\n",
-                entry.id, entry.title, entry.kind, entry.group
+                paint(crate::style::accent(), &entry.id),
+                entry.title,
+                entry.kind,
+                entry.group
             ));
             if let Some(step) = &entry.next_step {
                 out.push_str(&fill(labels.indented_line(), &[labels.next_step(), step]));
@@ -221,7 +228,7 @@ fn in_handoff(state: State) -> bool {
 pub fn render_handoff(language: &str, overview: &Overview) -> String {
     let labels = labels(language);
     let mut out = String::new();
-    out.push_str(labels.handoff_title());
+    out.push_str(&paint(crate::style::heading(), labels.handoff_title()));
     out.push_str(&fill(
         labels.counts_paren(),
         &[labels.generated_at(), &overview.generated_at],
@@ -235,7 +242,10 @@ pub fn render_handoff(language: &str, overview: &Overview) -> String {
             .collect::<Vec<_>>();
         out.push_str(&fill(
             labels.heading_count(),
-            &[state_label(&labels, state), &matching.len().to_string()],
+            &[
+                &paint(crate::style::heading(), state_label(&labels, state)),
+                &matching.len().to_string(),
+            ],
         ));
         if matching.is_empty() {
             out.push('\n');
@@ -244,7 +254,10 @@ pub fn render_handoff(language: &str, overview: &Overview) -> String {
         for entry in matching {
             out.push_str(&format!(
                 "- {} {} · {} · {}\n",
-                entry.id, entry.title, entry.kind, entry.group
+                paint(crate::style::accent(), &entry.id),
+                entry.title,
+                entry.kind,
+                entry.group
             ));
             out.push_str(&fill(
                 labels.indented_line(),

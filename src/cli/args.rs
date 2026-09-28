@@ -38,9 +38,25 @@ pub struct GlobalArgs {
     #[arg(long, global = true, value_name = "BCP47")]
     pub language: Option<String>,
 
+    /// 人读输出的着色策略：auto 仅在终端且未设置 NO_COLOR 时着色
+    #[arg(
+        long,
+        global = true,
+        value_name = "WHEN",
+        default_value = "auto",
+        value_parser = parse_color
+    )]
+    pub color: crate::style::Choice,
+
     /// 以 JSON 呈现结果
     #[arg(long, global = true)]
     pub json: bool,
+}
+
+/// 解析 `--color` 的取值。
+fn parse_color(value: &str) -> Result<crate::style::Choice, String> {
+    crate::style::Choice::parse(value)
+        .ok_or_else(|| format!("expected one of auto, always, never, got `{value}`"))
 }
 
 #[derive(Debug, Subcommand)]

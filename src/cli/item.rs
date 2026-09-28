@@ -2,12 +2,16 @@
 
 use std::collections::{BTreeMap, BTreeSet};
 
+use anstyle::Style;
+
 use crate::checks::CheckReport;
 use crate::domain::Scalar;
 use crate::error::{Result, WorkspaceError};
 use crate::kind::{check_field_value, render_template, template_values};
 use crate::output::{Labels, OutputMode, fill, labels, print_json};
 use crate::record::Record;
+use crate::status::State;
+use crate::style::{self, paint};
 use crate::time;
 use crate::workspace::Config;
 
@@ -116,7 +120,11 @@ pub fn add(context: &Context, args: &AddArgs) -> Result<()> {
 
     let record = workspace.index().require(&id)?;
     if !context.mode.is_json() {
-        println!("{} {}", labels(&language).created(), id);
+        println!(
+            "{} {}",
+            paint(style::ok(), labels(&language).created()),
+            paint(style::accent(), &id)
+        );
     }
     print_record(context.mode, &language, workspace.config(), record)
 }
@@ -190,7 +198,11 @@ pub fn update(context: &Context, args: &UpdateArgs) -> Result<()> {
 
     let record = workspace.index().require(&args.id)?;
     if !context.mode.is_json() {
-        println!("{} {}", labels(&language).updated(), args.id);
+        println!(
+            "{} {}",
+            paint(style::ok(), labels(&language).updated()),
+            paint(style::accent(), &args.id)
+        );
     }
     print_record(context.mode, &language, workspace.config(), record)
 }
@@ -218,7 +230,11 @@ pub fn log(context: &Context, args: &LogArgs) -> Result<()> {
 
     let record = workspace.index().require(&args.id)?;
     if !context.mode.is_json() {
-        println!("{} {}", labels(&language).updated(), args.id);
+        println!(
+            "{} {}",
+            paint(style::ok(), labels(&language).updated()),
+            paint(style::accent(), &args.id)
+        );
     }
     print_record(context.mode, &language, workspace.config(), record)
 }
@@ -252,9 +268,12 @@ fn lifecycle(context: &Context, id: &str, dropped: bool, reason: Option<&str>) -
     if !context.mode.is_json() {
         println!(
             "{} {} · {}",
-            labels.updated(),
-            id,
-            crate::output::lifecycle_text(&language, dropped)
+            paint(style::ok(), labels.updated()),
+            paint(style::accent(), id),
+            paint(
+                style::muted(),
+                crate::output::lifecycle_text(&language, dropped)
+            )
         );
     }
     print_record(context.mode, &language, workspace.config(), record)
@@ -475,21 +494,27 @@ pub fn print_report(
             "{}",
             fill(
                 labels.line(),
-                &[scope.checked_label(&labels), &report.checked.to_string()]
+                &[
+                    &paint(style::label(), scope.checked_label(&labels)),
+                    &report.checked.to_string(),
+                ]
             )
         );
         if report.is_ok() {
-            println!("{}", labels.ok());
+            println!("{}", paint(style::ok(), labels.ok()));
         } else {
             println!(
                 "{}",
                 fill(
                     labels.line(),
-                    &[labels.issues(), &report.issues.len().to_string()]
+                    &[
+                        &paint(style::warn(), labels.issues()),
+                        &paint(style::error(), &report.issues.len().to_string()),
+                    ]
                 )
             );
             for issue in &report.issues {
-                println!("- {issue}");
+                println!("- {}", paint(style::error(), &issue.to_string()));
             }
         }
     }
@@ -565,7 +590,10 @@ fn push_line(
     if !printed.insert(key.to_string()) {
         return;
     }
-    out.push_str(&fill(labels.record_line(), &[label, value]));
+    out.push_str(&fill(
+        labels.record_line(),
+        &[&paint(style::label(), label), value],
+    ));
 }
 
 /// 一条记录的人读文本。
@@ -619,13 +647,14 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
             .and_then(|name| config.kind(name))
             .and_then(crate::workspace::KindConfig::status_field)
             .unwrap_or("status");
+        let state_text = paint(state_style(state), crate::view::state_label(&labels, state));
         push_line(
             &labels,
             &mut out,
             &mut printed,
             key,
             labels.status(),
-            crate::view::state_label(&labels, state),
+            &state_text,
         );
     }
     if let Some(parent) = record.parent() {
@@ -721,22 +750,33 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
 pub fn record_line(language: &str, config: &Config, record: &Record) -> String {
     let kind = record.kind().unwrap_or("");
     let state = crate::status::of(config, record);
-    let status = if state == crate::status::State::NoStatus {
+    let status = if state == State::NoStatus {
         String::new()
     } else {
-        format!(" · {}", state.as_key())
+        format!(" · {}", paint(state_style(state), state.as_key()))
     };
     let lifecycle = if record.lifecycle().is_dropped() {
-        format!(" · {}", labels(language).dropped())
+        format!(" · {}", paint(style::muted(), labels(language).dropped()))
     } else {
         String::new()
     };
     format!(
         "{} {} · {kind} · {}{status}{lifecycle}",
-        record.id().unwrap_or(""),
+        paint(style::accent(), record.id().unwrap_or("")),
         record.title(),
         record.group()
     )
+}
+
+/// 状态在文本输出里的样式：完成绿、阻塞红、未验证黄、进行中青；待办与无状态不着色。
+fn state_style(state: State) -> Style {
+    match state {
+        State::Done => style::ok(),
+        State::Blocked => style::error(),
+        State::Unverified => style::warn(),
+        State::InProgress => style::accent(),
+        State::Todo | State::NoStatus => Style::new(),
+    }
 }
 
 fn declared_fields(kind: &crate::workspace::KindConfig) -> String {

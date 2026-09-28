@@ -2,6 +2,7 @@
 
 use crate::error::Result;
 use crate::output::labels;
+use crate::style::{self, paint};
 use crate::view;
 
 use super::Context;
@@ -38,7 +39,11 @@ pub fn summary(context: &Context, args: &SummaryArgs) -> Result<()> {
             value["saved"] = serde_json::Value::String(target.display().to_string());
             crate::output::print_json(&value)?;
         } else {
-            println!("{} {}", labels(&language).saved(), target.display());
+            println!(
+                "{} {}",
+                paint(style::ok(), labels(&language).saved()),
+                paint(style::muted(), &target.display().to_string())
+            );
         }
         return Ok(());
     }

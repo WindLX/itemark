@@ -50,6 +50,14 @@ pub fn run(cli: Cli) -> Result<()> {
         language: cli.global.language.clone(),
         mode: OutputMode::from_json(cli.global.json),
     };
+    // 着色只在人读文本下有意义；JSON 必须保持机器可读。
+    crate::style::enable(
+        !context.mode.is_json()
+            && cli.global.color.wants_color(
+                crate::style::stdout_is_terminal(),
+                crate::style::no_color_requested(),
+            ),
+    );
     dispatch(&context, cli.command)
 }
 
