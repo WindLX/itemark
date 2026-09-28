@@ -109,7 +109,7 @@ pub fn add(context: &Context, args: &AddArgs) -> Result<()> {
             if !missing.is_empty() {
                 return Err(WorkspaceError::usage(format!(
                     "setting the completion field to its completion value requires a non-empty {}; add it (or mark the result as unverified) before recording completion",
-                    missing.join(crate::output::labels(&language).list_separator())
+                    missing.join(" and ")
                 )));
             }
         }
@@ -182,7 +182,7 @@ pub fn update(context: &Context, args: &UpdateArgs) -> Result<()> {
             if !missing.is_empty() {
                 return Err(WorkspaceError::usage(format!(
                     "setting the completion field to its completion value requires a non-empty {}; add one (or mark the result as unverified) before recording completion",
-                    missing.join(crate::output::labels(&language).list_separator())
+                    missing.join(" and ")
                 )));
             }
         }
