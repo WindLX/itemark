@@ -38,6 +38,10 @@ fn an_empty_selection_says_so_instead_of_printing_nothing() {
     let zh = project.ok(&["list", "--group", "产品"]);
     assert_eq!(zh.trim(), "无匹配记录");
 
+    // `search` 与 `list` 共用同一条空结果提示。
+    let searched = project.ok(&["search", "查不到的词"]);
+    assert_eq!(searched.trim(), "无匹配记录");
+
     let en = project.ok(&["--language", "en", "list", "--group", "产品"]);
     assert_eq!(en.trim(), "no matching records");
 }

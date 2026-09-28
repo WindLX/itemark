@@ -153,7 +153,14 @@ fn a_closed_pipe_ends_quietly_instead_of_panicking() {
     let output = child.wait_with_output().expect("wait for the CLI");
     let stderr = String::from_utf8_lossy(&output.stderr);
     assert!(
-        !stderr.contains("panicked"),
-        "a closed pipe must not panic: {stderr}"
+        stderr.is_empty(),
+        "a closed pipe must not print anything to stderr: {stderr}"
+    );
+    use std::os::unix::process::ExitStatusExt;
+    assert_eq!(
+        output.status.signal(),
+        Some(libc::SIGPIPE),
+        "the default SIGPIPE disposition ends the process silently: {:?}",
+        output.status
     );
 }
