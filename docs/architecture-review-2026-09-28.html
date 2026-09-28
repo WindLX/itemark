@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>worklog · 架构评审 · 2026-09-28</title>
+<script src="https://cdn.tailwindcss.com"></script>
+<script type="module">
+  import mermaid from "https://cdn.jsdelivr.net/npm/mermaid@11/dist/mermaid.esm.min.mjs";
+  mermaid.initialize({ startOnLoad: true, theme: "neutral", securityLevel: "loose", flowchart: { curve: "basis" } });
+</script>
+<style>
+  .seam { stroke-dasharray: 4 4; }
+  .leak { stroke: #dc2626; }
+  .deep { background: linear-gradient(135deg, #0f172a, #1e293b); }
+  .mono { font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
+  .bar-interface { background: #94a3b8; }
+  .bar-impl { background: #cbd5e1; }
+  .bar-shallow { background: #fca5a5; }
+  article { scroll-margin-top: 1rem; }
+</style>
+</head>
+<body class="bg-stone-50 text-slate-900 font-sans">
+<main class="max-w-5xl mx-auto px-6 py-12 space-y-16">
+
+  <!-- ── 快照说明 ───────────────────────────────────────────── -->
+  <aside class="rounded-lg border border-amber-300 bg-amber-50 px-5 py-4 text-sm leading-relaxed">
+    <p class="font-semibold text-amber-900">这是一份时点快照，不是当前实现的状态。</p>
+    <p class="mt-1 text-amber-900">
+      评审基于提交 <span class="mono">4c9e733</span> 的工作树。此后已落地一轮评审修复，因此本文中的
+      行号与个别结论可能与当前 <span class="mono">src/</span> 不一致；取舍与后续动作以
+      <span class="mono">worklog/items/WL-0009.md</span>（候选 A）与
+      <span class="mono">WL-0010.md</span>（候选 B–E）为准，它们是在世、可更新的记录。
+    </p>
+  </aside>
+
+  <!-- ── Header ─────────────────────────────────────────────── -->
+  <header class="border-b border-slate-200 pb-8">
+    <div class="flex items-baseline justify-between flex-wrap gap-3">
+      <h1 class="font-serif text-4xl tracking-tight">worklog · 架构评审</h1>
+      <p class="text-sm text-slate-500">2026-09-28 · HEAD <span class="mono">4c9e733</span> · src/ 几乎全部未提交</p>
+    </div>
+    <p class="mt-3 text-sm text-slate-600 max-w-3xl">
+      Rust 同步 CLI，约 3.6k 行 <span class="mono">src/</span> 加 556 行集成测试；记录 = YAML 头部 + Markdown 正文，
+      索引每次现场重建。评审按 CONTEXT.md 的术语与深模块词汇进行。
+    </p>
+    <div class="mt-5 flex flex-wrap gap-5 text-xs text-slate-600">
+      <span class="flex items-center gap-2"><span class="inline-block w-6 h-4 border border-slate-400 bg-white"></span>module</span>
+      <span class="flex items-center gap-2"><svg width="34" height="8"><line x1="0" y1="4" x2="34" y2="4" stroke="#475569" stroke-width="2" stroke-dasharray="4 4"/></svg>seam</span>
+      <span class="flex items-center gap-2"><svg width="34" height="8"><line x1="0" y1="4" x2="28" y2="4" stroke="#dc2626" stroke-width="2"/><polygon points="34,4 26,0 26,8" fill="#dc2626"/></svg>泄漏 / 重复规则</span>
+      <span class="flex items-center gap-2"><span class="inline-block w-6 h-4 deep"></span>deep module</span>
+    </div>
+  </header>
+
+  <!-- ── Candidate A ────────────────────────────────────────── -->
+  <article id="candidate-a" class="space-y-6">
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <h2 class="font-serif text-2xl leading-snug max-w-2xl">A · 让「业务状态」和「完成依据」回到一个模块</h2>
+      <div class="flex gap-2 shrink-0">
+        <span class="text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded bg-emerald-100 text-emerald-800">Strong</span>
+        <span class="text-xs uppercase tracking-wider px-2.5 py-1 rounded bg-slate-100 text-slate-600">in-process</span>
+      </div>
+    </div>
+
+    <div class="text-sm mono text-slate-600 leading-relaxed">
+      src/view.rs:148-171（state_of） · src/record/mod.rs:95-99（status） · src/workspace/config.rs:54-67（status_field / completion_rule） ·
+      src/domain/id.rs:WORK_STATUSES（无人读取） · src/checks.rs:261-292（completion_issues） · src/checks.rs:306-334（missing_completion_parts） ·
+      src/cli/item.rs:91,153 · src/cli/mod.rs:149-152（status_of）
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="border border-slate-300 rounded-lg p-4 bg-white">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">before · 两个答案，四份判定</p>
+        <pre class="mermaid text-xs">
+flowchart TB
+  R[记录 + kind] --> V["view::state_of<br/>读 completion_field<br/>硬编码 todo/in_progress/blocked/done"]
+  R --> S["record::status<br/>读名为 status 的字段"]
+  R --> C1["checks::completion_issues<br/>完成门槛 ①"]
+  R --> C2["checks::missing_completion_parts<br/>完成门槛 ②"]
+  R --> M["cli::status_of<br/>又读 status 字段"]
+  V --> X["summary --json: state"]
+  S --> Y["show --json: status"]
+  M --> Z["list --status"]
+  C1 --> Q["check 的 CompletionEvidence"]
+  C2 --> G["add / update 的拒绝"]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#dc2626;
+  class C1,C2,S,M leak;
+        </pre>
+        <p class="mt-2 text-xs text-slate-500">红框：同一条规则 / 同一个概念的各一份实现。</p>
+      </div>
+      <div class="border-2 border-slate-800 rounded-lg p-4 bg-white">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">after · 一个判定，五个调用点</p>
+        <pre class="mermaid text-xs">
+flowchart TB
+  R[记录 + kind] --> D["完成语义<br/>业务状态 · 完成但未验证 · 完成依据缺口"]
+  D --> V[summary 总览]
+  D --> S[show / list]
+  D --> C[check]
+  D --> W[add / update]
+  classDef deep fill:#0f172a,color:#f8fafc,stroke:#0f172a;
+  class D deep;
+        </pre>
+        <div class="mt-3 space-y-2">
+          <div>
+            <p class="text-xs text-slate-500 mb-1">interface（小）</p>
+            <div class="h-4 rounded bar-interface" style="width:22%"></div>
+          </div>
+          <div>
+            <p class="text-xs text-slate-500 mb-1">implementation（大）</p>
+            <div class="h-4 rounded deep" style="width:100%"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6 text-sm">
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p>
+        <p>「一条记录是否已完成」有两套判定：<span class="mono">show</span>/<span class="mono">list</span> 读 kind 中名为 <span class="mono">status</span> 的字段，
+        而 <span class="mono">summary</span> 按 <span class="mono">completion_field</span> 归类并自行硬编码四个状态名；完成依据的门槛在 checks.rs 里也写了两遍，
+        于是同一条记录在 <span class="mono">show --json</span> 与 <span class="mono">summary --json</span> 里可以给出不同的业务状态。</p>
+      </div>
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p>
+        <p>让一个模块从「记录 + kind」算出唯一的业务状态与完成依据缺口——是否处于完成值、缺完成说明还是缺证据、还是已显式标注未验证——五个调用点都读这一个结果。</p>
+      </div>
+    </div>
+
+    <div class="bg-stone-100 rounded-lg p-5">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Benefits</p>
+      <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm list-disc list-inside marker:text-emerald-600">
+        <li>locality：业务状态规则只改一处</li>
+        <li>leverage：5 个调用点共用一次判定</li>
+        <li>locality：完成门槛不再写两遍</li>
+        <li>tests：show 与 summary 的状态可对账</li>
+        <li>删除测试：删掉重复判定，复杂性集中而非搬走</li>
+        <li>术语：业务状态 与 完成依据 各归一位</li>
+      </ul>
+    </div>
+
+    <div class="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm">
+      <span class="font-semibold">与既有决定的关系：</span> docs/design.md 与 docs/cli.md 明确写出字段名、配置键与状态名仍是工程草案，因此把业务状态收敛到一处不重开任何已定决策；
+      唯一需要重新挑选的是「事实的核实状态」如何由 kind 表达，这也是 CONTEXT.md 尚未定稿的部分。
+    </div>
+  </article>
+
+  <!-- ── Candidate B ────────────────────────────────────────── -->
+  <article id="candidate-b" class="space-y-6 border-t border-slate-200 pt-12">
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <h2 class="font-serif text-2xl leading-snug max-w-2xl">B · 让「检查发现」成为一个概念</h2>
+      <div class="flex gap-2 shrink-0">
+        <span class="text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded bg-amber-100 text-amber-800">Worth exploring</span>
+        <span class="text-xs uppercase tracking-wider px-2.5 py-1 rounded bg-slate-100 text-slate-600">in-process</span>
+      </div>
+    </div>
+
+    <div class="text-sm mono text-slate-600 leading-relaxed">
+      src/checks.rs:14-60（Issue / IssueKind / CheckReport / to_json） · src/cli/kind_cmd.rs:104-210（就地构造 Vec&lt;serde_json::Value&gt;，再从 JSON 反取字段） ·
+      src/cli/mod.rs:80-110（记录级 check 手工组装 known_ids 与 CheckReport） ·
+      src/workspace/config.rs:270-278（类型词表） · src/kind.rs:85-114（类型 match） · src/cli/kind_cmd.rs:143（date 特例）
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="border border-slate-300 rounded-lg p-4 bg-white">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">before · 两套模型，三处类型知识</p>
+        <pre class="mermaid text-xs">
+flowchart LR
+  A[check] --> I["checks::Issue / CheckReport"]
+  I --> O1["JSON: type / target / detail"]
+  B["kind check"] --> J["Vec 的 serde_json::Value"]
+  J --> O2["JSON: kind_declaration"]
+  J --> T["文本分支从 JSON 反取 target / detail"]
+  TY["类型词表 string/int/bool/enum/date"] --> D1["config::validate_field"]
+  TY --> D2["kind::check_field_value"]
+  TY --> D3["kind_cmd::check 的 date 分支"]
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#dc2626;
+  class TY,D3,J leak;
+        </pre>
+        <p class="mt-2 text-xs text-slate-500">呈现形状同时充当内部模型——文本输出要从 JSON 里把字段抠回来。</p>
+      </div>
+      <div class="border-2 border-slate-800 rounded-lg p-4 bg-white">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">after · 一类发现，两条检查</p>
+        <pre class="mermaid text-xs">
+flowchart LR
+  A[check] --> F["检查发现<br/>type · target · detail"]
+  B["kind check"] --> F
+  F --> J["一处 JSON 形状"]
+  F --> T["一处文本呈现"]
+  F --> E["一处非零退出码"]
+  F --> C["字段约束：声明期与写入期同一规则"]
+  classDef deep fill:#0f172a,color:#f8fafc,stroke:#0f172a;
+  class F deep;
+        </pre>
+        <div class="mt-3 text-xs text-slate-600 space-y-1">
+          <p><span class="font-semibold">接口面</span>：发现类型 + 目标 + 说明。</p>
+          <p><span class="font-semibold">实现面</span>：声明期校验、写入期校验、模板章节核对、记录关系核对、完成依据。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6 text-sm">
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p>
+        <p><span class="mono">check</span> 与 <span class="mono">kind check</span> 产出的是同一类「检查发现」，却各有一套模型与各自的 JSON 形状；
+        字段类型词表也在三处分别存在，声明期校验与写入期校验因此可以各自漂移。</p>
+      </div>
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p>
+        <p>让一个「检查发现」模块统一给出发现类型、目标与说明，并承载字段与章节约束这一条规则；两条检查命令都只产出它，JSON / 文本 / 退出码各只呈现一次。</p>
+      </div>
+    </div>
+
+    <div class="bg-stone-100 rounded-lg p-5">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Benefits</p>
+      <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm list-disc list-inside marker:text-emerald-600">
+        <li>locality：发现的形状只一处</li>
+        <li>leverage：check 与 kind check 共用</li>
+        <li>locality：类型词表不再三分</li>
+        <li>tests：kind check 可在进程边界断言</li>
+        <li>删除测试：kind_cmd 的 JSON 往返整段消失</li>
+        <li>locality：退出码策略只写一遍</li>
+      </ul>
+    </div>
+  </article>
+
+  <!-- ── Candidate C ────────────────────────────────────────── -->
+  <article id="candidate-c" class="space-y-6 border-t border-slate-200 pt-12">
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <h2 class="font-serif text-2xl leading-snug max-w-2xl">C · 一条记录只有一个投影</h2>
+      <div class="flex gap-2 shrink-0">
+        <span class="text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded bg-amber-100 text-amber-800">Worth exploring</span>
+        <span class="text-xs uppercase tracking-wider px-2.5 py-1 rounded bg-slate-100 text-slate-600">in-process</span>
+      </div>
+    </div>
+
+    <div class="text-sm mono text-slate-600 leading-relaxed">
+      src/cli/item.rs:369-404（record_json） · src/cli/item.rs:417-473（record_text） · src/cli/item.rs:475-490（record_line） ·
+      src/view.rs:87-120（Overview::to_json / Entry） · src/cli/group.rs（group show 复用 record_json） · src/cli/mod.rs（list / search 复用 print_records）
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="border border-slate-300 rounded-lg p-4 bg-white">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">before · 同一记录，两个机器形状</p>
+        <div class="space-y-3">
+          <div class="rounded border border-slate-200 p-3">
+            <p class="text-xs font-semibold mb-2 mono">show --json / list --json</p>
+            <div class="flex flex-wrap gap-1 text-[11px] mono">
+              <span class="px-1.5 py-0.5 rounded bg-slate-100">id</span><span class="px-1.5 py-0.5 rounded bg-slate-100">kind</span><span class="px-1.5 py-0.5 rounded bg-slate-100">group</span><span class="px-1.5 py-0.5 rounded bg-slate-100">title</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-100">fields</span><span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">status</span><span class="px-1.5 py-0.5 rounded bg-slate-100">parent</span><span class="px-1.5 py-0.5 rounded bg-slate-100">depends_on</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-100">completion_note</span><span class="px-1.5 py-0.5 rounded bg-slate-100">completion_evidence</span><span class="px-1.5 py-0.5 rounded bg-slate-100">lifecycle</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-100">body</span><span class="px-1.5 py-0.5 rounded bg-slate-100">path</span>
+            </div>
+          </div>
+          <div class="rounded border border-slate-200 p-3">
+            <p class="text-xs font-semibold mb-2 mono">summary --json · items[]</p>
+            <div class="flex flex-wrap gap-1 text-[11px] mono">
+              <span class="px-1.5 py-0.5 rounded bg-slate-100">id</span><span class="px-1.5 py-0.5 rounded bg-slate-100">title</span><span class="px-1.5 py-0.5 rounded bg-slate-100">kind</span><span class="px-1.5 py-0.5 rounded bg-slate-100">group</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-100">parent</span><span class="px-1.5 py-0.5 rounded bg-slate-100">depends_on</span><span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700">state</span><span class="px-1.5 py-0.5 rounded bg-slate-100">lifecycle</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-100">next_step</span>
+            </div>
+            <p class="mt-2 text-[11px] text-rose-700">status 与 state 来源不同，字段集合也不同。</p>
+          </div>
+        </div>
+      </div>
+      <div class="border-2 border-slate-800 rounded-lg p-4 bg-white">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">after · 一个投影，总览只做聚合</p>
+        <pre class="mermaid text-xs">
+flowchart TB
+  R[记录 + kind] --> P["记录投影<br/>业务状态 · 生命周期 · 下一步 · 章节正文"]
+  P --> S[show]
+  P --> L[list / search]
+  P --> G[group show]
+  P --> O[summary 聚合]
+  O --> H[交接摘要]
+  classDef deep fill:#0f172a,color:#f8fafc,stroke:#0f172a;
+  class P deep;
+        </pre>
+        <div class="mt-3 grid grid-cols-2 gap-3 text-xs">
+          <div><p class="text-slate-500 mb-1">interface</p><div class="h-4 rounded bar-interface" style="width:30%"></div></div>
+          <div><p class="text-slate-500 mb-1">implementation</p><div class="h-4 rounded deep" style="width:100%"></div></div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6 text-sm">
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p>
+        <p>同一条记录有两个机器形状：详细视图以头部为中心，总览条目以清单为中心，字段集合与状态来源都不同，消费脚本要学两套 schema，两处也各自维护。</p>
+      </div>
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p>
+        <p>让一个「记录投影」模块给出记录的唯一形状（含业务状态、生命周期、下一步与正文章节），详细视图与总览都从它取数，总览只负责分组与计数。</p>
+      </div>
+    </div>
+
+    <div class="bg-stone-100 rounded-lg p-5">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Benefits</p>
+      <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm list-disc list-inside marker:text-emerald-600">
+        <li>locality：记录形状只一处</li>
+        <li>leverage：5 条命令共用一次投影</li>
+        <li>tests：show 与 summary 字段可对账</li>
+        <li>locality：交接摘要不再自建条目形状</li>
+        <li>删除测试：删掉第二份形状，复杂性集中</li>
+        <li>术语：记录与视图的分工清晰</li>
+      </ul>
+    </div>
+  </article>
+
+  <!-- ── Candidate D ────────────────────────────────────────── -->
+  <article id="candidate-d" class="space-y-6 border-t border-slate-200 pt-12">
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <h2 class="font-serif text-2xl leading-snug max-w-2xl">D · cli 层不再承载文案与配置写法</h2>
+      <div class="flex gap-2 shrink-0">
+        <span class="text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded bg-amber-100 text-amber-800">Worth exploring</span>
+        <span class="text-xs uppercase tracking-wider px-2.5 py-1 rounded bg-slate-100 text-slate-600">in-process</span>
+      </div>
+    </div>
+
+    <div class="text-sm mono text-slate-600 leading-relaxed">
+      src/cli/group.rs:43（写死「条记录」） · src/cli/group.rs:58-76（读 config.raw_text，拼 TOML，再 std::fs::write） ·
+      src/cli/config_cmd.rs:43-85（init 完全绕过 Context，直接打印中文） · src/cli/kind_cmd.rs:190-205（文本分支从 JSON 构造） ·
+      src/output.rs:37-96（Labels 是唯一的语言 seam） · src/workspace/config.rs（raw_text 与配置路径）
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="border border-slate-300 rounded-lg p-4 bg-white">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">before · cli 层里的三段厚度</p>
+        <div class="space-y-1.5">
+          <div class="h-12 border-l-4 border-slate-400 bg-slate-100 px-3 flex items-center text-xs">子命令编排（add / update / log / drop）</div>
+          <div class="h-12 border-l-4 border-rose-400 bg-rose-50 px-3 flex items-center text-xs text-rose-800">写死的中文文案：group、kind、init 绕过 Labels</div>
+          <div class="h-12 border-l-4 border-rose-400 bg-rose-50 px-3 flex items-center text-xs text-rose-800">TOML 拼接 + std::fs::write（group add）</div>
+          <div class="h-12 border-l-4 border-slate-400 bg-slate-100 px-3 flex items-center text-xs">JSON 形状充当文本模型的中间层（kind check）</div>
+        </div>
+        <pre class="mermaid text-xs mt-4">
+flowchart LR
+  G["group add"] --> RT["Config::raw_text"]
+  RT --> FS["std::fs::write(config_path)"]
+  I["init"] --> CN["中文字面量"]
+  K["kind show / list"] --> CN
+  classDef leak stroke:#dc2626,stroke-width:2px,color:#dc2626;
+  class RT,FS,CN leak;
+        </pre>
+      </div>
+      <div class="border-2 border-slate-800 rounded-lg p-4 bg-white">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">after · cli 只管意图</p>
+        <pre class="mermaid text-xs">
+flowchart LR
+  G["group add"] --> C["配置模块<br/>读—改—写一个动作"]
+  I["init"] --> C
+  A["所有命令"] --> P["呈现模块<br/>Labels 唯一语言 seam"]
+  G --> P
+  I --> P
+  K["kind check"] --> P
+  classDef deep fill:#0f172a,color:#f8fafc,stroke:#0f172a;
+  class C,P deep;
+        </pre>
+        <div class="mt-4 space-y-1.5">
+          <div class="h-12 border-l-4 border-slate-800 deep text-slate-100 px-3 flex items-center text-xs">cli：参数与编排，薄</div>
+          <div class="h-12 border-l-4 border-slate-800 bg-slate-200 px-3 flex items-center text-xs">呈现 / 配置模块：厚</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6 text-sm">
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p>
+        <p><span class="mono">Labels</span> 是唯一的语言 seam，但 group / kind / init 的文案直接写死中文；<span class="mono">group add</span> 还用配置的原始文本拼 TOML 再写盘，把配置文件写法放进了 CLI 层，<span class="mono">init</span> 甚至完全绕过 <span class="mono">Context</span>。</p>
+      </div>
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p>
+        <p>呈现文本统一由呈现模块给出（语言设置对每条命令生效），配置的改动由配置模块作为一个「读—改—写」动作承担，CLI 只传意图。</p>
+      </div>
+    </div>
+
+    <div class="bg-stone-100 rounded-lg p-5">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Benefits</p>
+      <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm list-disc list-inside marker:text-emerald-600">
+        <li>locality：文案只在一处</li>
+        <li>locality：TOML 写法只在一处</li>
+        <li>leverage：--language en 覆盖所有命令</li>
+        <li>tests：语言切换可在进程边界断言</li>
+        <li>seam：配置写入成为可复用的动作</li>
+        <li>删除测试：cli 层去掉拼接后更薄</li>
+      </ul>
+    </div>
+  </article>
+
+  <!-- ── Candidate E ────────────────────────────────────────── -->
+  <article id="candidate-e" class="space-y-6 border-t border-slate-200 pt-12">
+    <div class="flex items-start justify-between gap-4 flex-wrap">
+      <h2 class="font-serif text-2xl leading-snug max-w-2xl">E · 领域词汇与章节名没有归属</h2>
+      <div class="flex gap-2 shrink-0">
+        <span class="text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded bg-slate-200 text-slate-700">Speculative</span>
+        <span class="text-xs uppercase tracking-wider px-2.5 py-1 rounded bg-slate-100 text-slate-600">in-process</span>
+      </div>
+    </div>
+
+    <div class="text-sm mono text-slate-600 leading-relaxed">
+      src/record/mod.rs:18-20（上级事项 / 完成说明 / 证据） · src/view.rs:175-184（下一步 / 当前下一步 / 进展） ·
+      src/cli/args.rs（--section 默认「进展」） · src/cli/item.rs:223（drop 理由写进「进展」） ·
+      src/domain/id.rs:WORK_STATUSES（声明后无人读取） · src/domain/id.rs:ItemId（新类型，接口与实现同大）
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6">
+      <div class="border border-slate-300 rounded-lg p-4 bg-white">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">before · 同一词汇，四处出现；两个浅模块</p>
+        <div class="space-y-3 text-xs">
+          <div>
+            <p class="mono mb-1">「进展」</p>
+            <div class="flex flex-wrap gap-1">
+              <span class="px-1.5 py-0.5 rounded bg-slate-100 mono">view.rs:184</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-100 mono">cli/args.rs</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-100 mono">cli/item.rs:223</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-100 mono">templates/work.md</span>
+            </div>
+          </div>
+          <div>
+            <p class="mono mb-1">业务状态四值</p>
+            <div class="flex flex-wrap gap-1">
+              <span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 mono">domain/id.rs:WORK_STATUSES</span>
+              <span class="px-1.5 py-0.5 rounded bg-rose-100 text-rose-700 mono">view.rs:156-170</span>
+              <span class="px-1.5 py-0.5 rounded bg-slate-100 mono">worklog.toml enum</span>
+            </div>
+          </div>
+          <div class="pt-2 space-y-2">
+            <div>
+              <p class="text-slate-500 mb-1 mono">domain::ItemId — interface ≈ implementation</p>
+              <div class="flex gap-1"><div class="h-3 rounded bar-shallow" style="width:80%"></div><div class="h-3 rounded bar-shallow" style="width:80%"></div></div>
+            </div>
+            <div>
+              <p class="text-slate-500 mb-1 mono">domain::WORK_STATUSES — 0 个调用点</p>
+              <div class="flex gap-1"><div class="h-3 rounded bar-interface" style="width:60%"></div><div class="h-3 rounded bar-impl" style="width:0%"></div></div>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="border-2 border-slate-800 rounded-lg p-4 bg-white">
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">after · 词汇有归属，浅模块删除或变深</p>
+        <pre class="mermaid text-xs">
+flowchart TB
+  V["领域词汇 / 章节名<br/>业务状态 · 进展 · 完成说明 · 证据"]
+  V --> R[record 读写]
+  V --> W[view 总览]
+  V --> C[cli 默认值]
+  V --> K[kind 模板与检查]
+  classDef deep fill:#0f172a,color:#f8fafc,stroke:#0f172a;
+  class V deep;
+        </pre>
+        <div class="mt-3 text-xs text-slate-600 space-y-1">
+          <p><span class="font-semibold">ItemId</span>：删除测试通过——删掉它没有任何行为消失，<span class="mono">Record::id()</span> 已经返回 <span class="mono">&amp;str</span>。</p>
+          <p><span class="font-semibold">WORK_STATUSES</span>：要么成为唯一词表，要么删除；当前两种都不成立。</p>
+        </div>
+      </div>
+    </div>
+
+    <div class="grid md:grid-cols-2 gap-6 text-sm">
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Problem</p>
+        <p>领域词汇与章节名散落在 record、view、cli、domain 四个模块中，改一个词要跨模块搜索；<span class="mono">WORK_STATUSES</span> 声明后无人读取，
+        <span class="mono">ItemId</span> 的接口与实现一样大且几乎无人使用——两个浅模块都不产生杠杆。</p>
+      </div>
+      <div>
+        <p class="text-xs uppercase tracking-wider text-slate-500 mb-1">Solution</p>
+        <p>让领域词汇与章节名有一个归属（或由 kind 声明），record / view / cli 都从它取；删除无杠杆的浅模块，或让它们真正被使用。</p>
+      </div>
+    </div>
+
+    <div class="bg-stone-100 rounded-lg p-5">
+      <p class="text-xs uppercase tracking-wider text-slate-500 mb-3">Benefits</p>
+      <ul class="grid sm:grid-cols-2 gap-x-8 gap-y-1.5 text-sm list-disc list-inside marker:text-emerald-600">
+        <li>locality：词汇一处声明</li>
+        <li>deletion test：ItemId 删除不损失行为</li>
+        <li>tests：章节名变更只动一处</li>
+        <li>leverage：词表被所有读者共用</li>
+        <li>locality：模板与检查对齐同一词表</li>
+        <li>术语：与 CONTEXT.md 一一对应</li>
+      </ul>
+    </div>
+
+    <div class="border-l-4 border-amber-400 bg-amber-50 px-4 py-3 text-sm">
+      <span class="font-semibold">与既有决定的关系：</span> AGENTS.md 要求「没有当前需求就不加 traits、多后端抽象、框架或防御性检查」，
+      这支持删除 <span class="mono">ItemId</span> 与无人读取的 <span class="mono">WORK_STATUSES</span>；本候选不新增层，只把已有词汇收拢到一处。
+    </div>
+  </article>
+
+  <!-- ── Top recommendation ─────────────────────────────────── -->
+  <section class="border-t border-slate-200 pt-12">
+    <h2 class="font-serif text-2xl mb-5">Top recommendation</h2>
+    <div class="border-2 border-slate-800 rounded-xl p-7 bg-white">
+      <div class="flex items-start justify-between gap-4 flex-wrap">
+        <h3 class="font-serif text-xl"><a href="#candidate-a" class="underline decoration-slate-300 hover:decoration-slate-800">A · 让「业务状态」和「完成依据」回到一个模块</a></h3>
+        <span class="text-xs font-semibold uppercase tracking-wider px-2.5 py-1 rounded bg-emerald-100 text-emerald-800">Strong</span>
+      </div>
+      <p class="mt-4 text-sm leading-relaxed max-w-3xl">
+        完成依据是这个项目最核心的语义——CONTEXT.md 把「完成依据」与「工作业务状态」列为独立概念，docs/cli.md 把「完成值需要完成说明与证据（或显式未验证）」写成一条固定规则，
+        而交接摘要正是靠它区分「完成」与「完成但未验证」。现在这条规则有两份实现，业务状态有两个来源：<span class="mono">show</span> 读名为 <span class="mono">status</span> 的字段，
+        <span class="mono">summary</span> 读 <span class="mono">completion_field</span> 并自行硬编码状态名。测试夹具里的 <span class="mono">project-note</span>（字段只有 title 与 phase）就是一条会暴露这种分叉的记录。
+        先做 A，能让交接摘要在进程边界上第一次有唯一可信的业务状态与完成判定；B 与 C 都建立在「一条记录只有一个判定」之上，做在 A 之后代价更低。
+      </p>
+      <div class="mt-5 grid sm:grid-cols-3 gap-4 text-xs">
+        <div class="rounded bg-stone-100 p-3"><p class="text-slate-500 mb-1">first move</p><p>让 5 个调用点读同一个判定，删除重复的完成门槛。</p></div>
+        <div class="rounded bg-stone-100 p-3"><p class="text-slate-500 mb-1">watch out</p><p>事实的核实状态如何由 kind 表达尚未在 CONTEXT.md 定稿。</p></div>
+        <div class="rounded bg-stone-100 p-3"><p class="text-slate-500 mb-1">test payoff</p><p>同一 ID 在 show 与 summary 中的状态可对账断言。</p></div>
+      </div>
+    </div>
+  </section>
+
+  <footer class="border-t border-slate-200 pt-6 text-xs text-slate-500">
+    本报告只读地检视了 /home/windlx/App/worklog；评审过程中未创建、修改或删除仓库内任何文件。候选按 payoff 与摩擦排序，接口形状留待下一步。
+  </footer>
+</main>
+</body>
+</html>
