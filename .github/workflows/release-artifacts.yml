@@ -1,0 +1,142 @@
+name: Release artifacts (manual)
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Version label used in artifact names (for example 0.1.0)
+        required: true
+        type: string
+  push:
+    branches:
+      - codex/release-prep
+
+permissions:
+  contents: read
+
+jobs:
+  version:
+    name: Resolve artifact version
+    runs-on: ubuntu-24.04
+    outputs:
+      value: ${{ steps.resolve.outputs.value }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Match artifact version to Cargo.toml
+        id: resolve
+        shell: bash
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/itemark-metadata.json"
+          package_version=$(python3 -c 'import json,sys; data=json.load(open(sys.argv[1])); print(next(p["version"] for p in data["packages"] if p["name"] == "itemark"))' "$RUNNER_TEMP/itemark-metadata.json")
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            [[ "$INPUT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.]+)?$ ]]
+            [[ "$INPUT_VERSION" == "$package_version" ]] || { echo "requested version $INPUT_VERSION does not match Cargo.toml $package_version" >&2; exit 1; }
+            version="$INPUT_VERSION"
+          else
+            version="$package_version"
+          fi
+          echo "value=$version" >> "$GITHUB_OUTPUT"
+
+  binary:
+    name: Build ${{ matrix.target }}
+    needs: version
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: ubuntu-24.04
+            target: x86_64-unknown-linux-gnu
+          - runner: ubuntu-24.04-arm
+            target: aarch64-unknown-linux-gnu
+          - runner: macos-15-intel
+            target: x86_64-apple-darwin
+          - runner: macos-15
+            target: aarch64-apple-darwin
+          - runner: windows-latest
+            target: x86_64-pc-windows-msvc
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - name: Build release binary
+        run: cargo build --locked --release --target ${{ matrix.target }}
+      - name: Package Unix binary
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.value }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          [[ "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.]+)?$ ]]
+          actual_version=$("target/$TARGET/release/itemark" --version)
+          [[ "$actual_version" == "itemark $VERSION" ]] || { echo "artifact version $VERSION does not match binary: $actual_version" >&2; exit 1; }
+          mkdir -p dist
+          cp "target/$TARGET/release/itemark" LICENSE dist/
+          tar -czf "itemark-v${VERSION}-${TARGET}.tar.gz" -C dist itemark LICENSE
+      - name: Package Windows binary
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.value }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          if ($env:VERSION -notmatch '\A[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.]+)?\z') { throw 'Version must be a dotted numeric version with an optional prerelease/build suffix' }
+          $actualVersion = (& "target/$env:TARGET/release/itemark.exe" --version | Out-String).Trim()
+          if ($actualVersion -ne "itemark $env:VERSION") { throw "Artifact version $env:VERSION does not match binary: $actualVersion" }
+          New-Item -ItemType Directory -Force dist | Out-Null
+          Copy-Item "target/$env:TARGET/release/itemark.exe" dist/itemark.exe
+          Copy-Item LICENSE dist/LICENSE
+          $archive = "itemark-v$env:VERSION-$env:TARGET.zip"
+          Compress-Archive -Path dist/* -DestinationPath $archive
+      - uses: actions/upload-artifact@v4
+        with:
+          name: itemark-${{ matrix.target }}
+          path: itemark-v${{ needs.version.outputs.value }}-${{ matrix.target }}.*
+          if-no-files-found: error
+          retention-days: 30
+
+  skill:
+    name: Package portable skill
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package canonical skill source
+        env:
+          VERSION: ${{ needs.version.outputs.value }}
+        run: |
+          [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.]+)?$ ]]
+          test -f .agents/skills/itemark/SKILL.md
+          mkdir -p stage/itemark
+          cp -R .agents/skills/itemark/. stage/itemark/
+          (cd stage && zip -qr "../itemark-skill-v${VERSION}.zip" itemark)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: itemark-skill
+          path: itemark-skill-v${{ needs.version.outputs.value }}.zip*
+          if-no-files-found: error
+          retention-days: 30
+
+  bundle:
+    name: Collect checksums and complete bundle
+    needs: [version, binary, skill]
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: itemark-*
+          path: bundle
+          merge-multiple: true
+      - name: Write SHA256SUMS
+        working-directory: bundle
+        run: sha256sum itemark-v*.tar.gz itemark-v*.zip itemark-skill-v*.zip > SHA256SUMS
+      - uses: actions/upload-artifact@v4
+        with:
+          name: itemark-release-bundle
+          path: bundle/*
+          if-no-files-found: error
+          retention-days: 30
