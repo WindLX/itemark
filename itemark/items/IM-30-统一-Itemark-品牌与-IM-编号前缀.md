@@ -25,6 +25,8 @@ completion_evidence: Cargo.toml/CLI 入口为 itemark；配置/数据为 itemark
 
 ## 证据
 
+- 2026-09-29：本地目录迁移证据：仓库从 `/home/windlx/App/worklog` 移至 `/home/windlx/App/itemark`；执行前确认目标不存在、源目录存在且没有 cargo/rustc 构建进程。移动后 branch=main、HEAD=001ee8ab、origin=git@github.com:WindLX/itemark.git，CLI检查34条记录通过。
+
 ## 进展
 
 - 2026-09-29：Itemark/itemark 品牌已进入 Cargo 包与二进制、itemark.toml、README/规范/skill、GitHub 仓库及自举数据。发布文档明确目前无 GitHub Release 资产。

@@ -3,7 +3,9 @@ id: IM-22
 kind: work
 group: 实现
 title: Itemark CLI、自举与文档基础
-status: in_progress
+status: done
+completion_note: 当前 Itemark CLI、自举、文档与终端改进批次已完成；本结项不代表发布，也不关闭归档、聚合或正文稳定引用工作。
+completion_evidence: itemark list --json 确认 IM-23/24/25/26/29/30/33/34 均为 done；新路径下 itemark check --json 检查34条记录，issues=[]；IM-30 已追加实际本地目录迁移证据。其余未完事项为 IM-27 发布准备、IM-28 归档讨论、IM-31 机械聚合讨论、IM-32 正文稳定引用讨论，保持后置。
 ---
 
 ## 目标
@@ -16,7 +18,7 @@ status: in_progress
 
 ## 当前下一步
 
-等待 IM-29、IM-30、IM-33、IM-34 收尾，再运行最终文档/CLI核对并完成本批。
+本批已完成。IM-27发布准备及IM-28归档、IM-31聚合、IM-32正文稳定引用仍未完成；公开发布另需用户最终确认。
 
 ## 历史进展
 
