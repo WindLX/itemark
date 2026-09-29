@@ -3,7 +3,7 @@ id: IM-27
 kind: work
 group: 实现
 title: 准备 Itemark 发布产物与安全安装卸载
-status: in_progress
+status: done
 parent: IM-22
 depends_on:
 - IM-22
@@ -16,6 +16,8 @@ depends_on:
 - IM-34
 - IM-35
 - IM-36
+completion_note: 发布准备与首次正式发布完成：Release 由 tag 触发，五目标预编译包、skill 包、SHA256SUMS 与 GitHub Release 均已产出；安装/卸载脚本支持 curl 与 PowerShell 远程执行，卸载只删安装器自己放置的二进制与带标记的 skill。
+completion_evidence: 提交 c94c236 改为 tag 触发发布、62adc96 增加在线安装/卸载、a4b3ce3 更新 README、0a2b075 修复 Windows 在线安装的校验和查找。首次 v0.1.0 tag 运行 https://github.com/WindLX/itemark/actions/runs/36536874373 因 Windows 在线安装 smoke 失败（SHA256SUMS is missing a checksum for itemark.zip）未创建 Release；修复后重推 tag，https://github.com/WindLX/itemark/actions/runs/36537457866 九项作业全部成功并创建 https://github.com/WindLX/itemark/releases/tag/v0.1.0（7 个资产：五目标二进制归档、itemark-skill-v0.1.0.zip、SHA256SUMS）。本机 Linux x86_64 实测 latest 在线安装（含 codex skill profile）→ 版本 0.1.0、skill 与 receipt 正确；在线卸载无残留且保留无关文件；发布页归档 sha256sum -c 校验成功。Windows 由 windows-latest runner 的归档安装/卸载与在线安装/卸载 smoke 实测通过。crates.io 未发布。
 ---
 
 ## 目标
@@ -28,7 +30,7 @@ depends_on:
 
 ## 当前下一步
 
-推送 `v0.1.0` tag 触发 GitHub Release 前须取得用户最终确认；确认后打 tag 并 push。Windows 在线安装/卸载由 release workflow 的 windows-latest job 实测。crates.io 发布单独授权，不与 Release 联动。
+无。tag 与 GitHub Release 已发布并实测；crates.io 发布仍单独授权，不与 Release 自动联动。
 
 ## 历史进展
 
@@ -50,3 +52,6 @@ depends_on:
 - 2026-09-29：安装/卸载脚本支持远程执行：install.sh / install.ps1 默认从 Release 取 latest，可用 --version / -Version 固定版本，下载归档与 SHA256SUMS 后校验（sha256sum/shasum/openssl 或 Get-FileHash），校验失败或中途出错回滚不留残留；uninstall.sh / uninstall.ps1 可直接 curl / irm 管道执行，按 receipt 只删安装器放置的二进制与带 .itemark-managed 标记的个人 skill，保留父目录与项目记录。
 - 2026-09-29：安装器新增 --repo / --base-url（-Repo / -BaseUrl）与环境变量 ITEMARK_REPO / ITEMARK_BASE_URL / ITEMARK_VERSION / ITEMARK_PREFIX，base-url 用于镜像与测试且必须显式指定版本；根 README 增加「发布流程」「预编译安装（在线 curl / PowerShell）」章节，crates-io/README 增加预编译包安装入口。
 - 2026-09-29：本地端到端验证通过：本地静态服务器托管与 Release 同构的资产（含 SHA256SUMS），curl 管道在线安装（含 codex skill profile）→ 断言二进制版本、skill、receipt 与保留无关文件 → 在线卸载后无残留 → 重装 → 篡改校验和时中止且不留残留 → --base-url 缺 --version 被拒 → 本地 --archive 安装/卸载。sh -n 与 js-yaml 校验 release.yml 均通过；Windows 脚本本机无 pwsh，未实测，由 workflow 的 windows-latest job 验证。
+- 2026-09-29：v0.1.0 tag 首次推送后 Release workflow 失败：五个目标中 Windows x86_64-pc-windows-msvc 的「在线安装 smoke」在 install.ps1 校验步骤中止（SHA256SUMS is missing a checksum for itemark.zip）——远程模式把归档存成通用名，与 SHA256SUMS 里的发布资产名不一致；Unix 在线安装、四个非 Windows 目标与 Windows 归档安装/卸载 smoke 均通过。因为失败发生在 bundle 之前，未创建 GitHub Release，符合"全部通过才发布"的设计。修复：按发布资产名 itemark-v<版本>-<目标>.zip 与 itemark-skill-v<版本>.zip 落盘（提交 0a2b075），并把 v0.1.0 tag 移到该提交后重推。
+- 2026-09-29：修复后重推 v0.1.0 tag，Release workflow 九项作业全部成功（https://github.com/WindLX/itemark/actions/runs/36537457866），已创建公开 Release https://github.com/WindLX/itemark/releases/tag/v0.1.0，含 7 个资产：五目标二进制归档（Linux/macOS x86_64 与 aarch64、Windows x86_64）、itemark-skill-v0.1.0.zip 与 SHA256SUMS。
+- 2026-09-29：真实发布端到端复核（本机 Linux x86_64，走 raw.githubusercontent.com 上的 main 分支脚本）：`curl -fsSL .../install.sh | sh -s -- --prefix <tmp> --skill-profile codex --skill-home <tmp>` 以 latest 解析到 v0.1.0、下载并校验通过、装好二进制与 skill，`itemark --version` 输出 0.1.0；在线卸载无残留且保留无关文件；另下载发布页归档与 SHA256SUMS，`sha256sum -c` 对 x86_64-linux 归档校验成功。
