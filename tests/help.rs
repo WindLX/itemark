@@ -20,6 +20,7 @@ const ENGLISH_SCAFFOLDING: [&str; 6] = [
 #[test]
 fn built_in_help_text_is_localized() {
     let project = Project::new();
+    project.configure();
 
     for args in [
         vec!["--help"],
