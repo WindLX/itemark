@@ -1,0 +1,51 @@
+---
+id: IM-2
+kind: work
+group: 实现
+title: Build the minimum worklog CLI
+status: done
+parent: null
+depends_on: []
+completion_note: 最小 worklog CLI 已实现并验收：add/show/init/list/search/update/log/drop/restore/group/kind/check/summary 全部命令，取值顺序 CLI 参数 > worklog.toml > 内置默认，项目写锁与项目唯一 ID 自首次写入即生效，kind 声明的完成字段与完成值触发固定完成规则。
+completion_evidence: just ci 全绿（38 个单元测试 + 26 个集成测试，分布于 tests/ 下按能力划分的 11 个文件）。
+---
+
+# Build the minimum worklog CLI
+
+## 目标
+
+Initialize the Rust + Clap CLI and implement configuration-driven kind definitions, `add`, and `show` as the first real record path. Preserve Markdown as the authoritative record format.
+
+## 验收
+
+- [ ] Initialize a single Rust crate and synchronous Clap CLI; implement `worklog.toml` with precedence CLI arguments > project configuration > built-in defaults, including the project language setting (default `zh-CN`).
+- [ ] Load kind definitions and Markdown templates from project files. The CLI can show and check them, but does not edit them. Kinds support simple fields, required/type/enum checks, and required Markdown sections that must exist and be nonempty; no programmable rules or workflow behavior.
+- [ ] Implement `add` and `show` for one real file-backed record path, with human-readable text by default and optional JSON output.
+- [ ] Use the configured project language for human-readable project documentation, templates, generated human-readable text, and CLI prompts. Keep command names, IDs, configuration keys, and JSON keys as stable machine identifiers; this project's default is `zh-CN`.
+- [ ] Allow `add` to create a record with a required field or section empty; `check` reports the missing value. Do not introduce a draft state.
+- [ ] On the first write, acquire the project lock and allocate a project-wide unique ID; report lock contention and ID conflicts clearly.
+- [ ] If a kind explicitly declares a completion field and value, enforce the fixed completion rule from the first implementation: nonempty completion explanation plus evidence, or an explicit unverified explanation. Do not allow a completion-valued record through `check` without this evidence.
+- [ ] Keep the current hand-maintained v0 records identified as awaiting adaptation, not as examples of the final accepted format. Do not modify IM-1.
+
+## 当前下一步
+
+Start with the approved `add` and `show` path. There are no unfinished dependencies.
+
+## 历史进展
+
+- 2026-09-28: Created as a planned work item based on the user's approved scope relayed in this conversation. No CLI operations have been implemented or verified.
+- 2026-09-28 [决策]: 首期采用单个 Rust crate 和同步 CLI，以普通函数按职责组织；每次查询从 Markdown 现场构建索引，不使用数据库或持久查询缓存，可按需生成面向人阅读的总览。命令和字段格式仍未冻结。
+- 2026-09-28 [决策]: 事项文件采用 YAML 头部和 Markdown 正文，使用成熟 YAML 库；CLI 定向更新字段或章节时保留用户正文，不重排整篇。默认人读文本，可选 JSON 呈现；同一操作只切换呈现方式，错误使用非零退出状态。项目级 `worklog.toml` 可配置事项目录和少量查询默认值，优先级为 CLI 参数、项目配置、内置默认值；精确字段未定。
+- 2026-09-28 [范围变更]: 首期从记录工作事项扩展为原生管理工作事项、事实与术语，不再只引用已有 facts/terms。是否设固定类型、支持用户自定义 kind、group 的组织方式及事实/术语生命周期均待确认；未增加字段或状态模型。本次变更不涉及 LZB，也不含迁移。
+- 2026-09-28 [用户裁定]: 批准将 CLI 首期拆分为 IM-2–IM-8；本项负责初始化、kind 配置读取/检查及首个 add/show 路径，含 CLI > 项目 TOML > 默认值、文本/JSON、基础字段值校验、允许必填项暂空并由 check 报缺（不设 draft），首次写即项目锁和唯一 ID。无未完成依赖。
+- 2026-09-28 [纠正]: 上一条范围变更中“kind、group、事实/术语生命周期均待确认”已过期。kind 使用配置和模板，支持少量字段约束与必填章节；CLI 只读取、展示和检查定义。当前手工记录仍是 v0，后续适配，不作为新版合法范例。
+- 2026-09-28 [约束]: kind 若声明完成字段和值，本项从首次写入即执行固定完成检查；完成说明加证据，或明确未验证说明，不能等到后续任务才补。工作事项状态为四值；事实核实状态独立；术语无业务状态。通用废弃/恢复由 IM-7 处理。
+- 2026-09-28 [用户裁定]: 项目可配置人读语言，优先级服从 CLI 参数 > 项目 TOML > 内置默认；Worklog 本库默认 `zh-CN`。人读文档、模板、summary 与 CLI 提示跟随项目语言，命令、ID、配置键和 JSON 键保留机器名称。
+
+## 证据
+
+- User-approved worklog scope relayed in this conversation; checked 2026-09-28. No CLI evidence exists yet.
+
+## 进展
+
+- 2026-09-28：已实现并验证：单 crate 同步 CLI，覆盖 init/add/show/list/search/update/log/drop/restore/group/kind/check/summary；配置取值顺序 CLI 参数 > worklog.toml > 内置默认；项目写锁与项目唯一 ID 分配自首次写入即生效；kind 声明的完成字段与完成值触发固定完成规则（非空完成说明 + 证据，或显式未验证说明）。验证方式：just ci 全绿（38 个单元测试 + 15 个集成测试，分布于 tests/ 下按能力划分的 11 个文件）。

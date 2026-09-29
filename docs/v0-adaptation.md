@@ -1,5 +1,7 @@
 # v0 记录适配说明（WL-0001 … WL-0008）
 
+> 当前状态（2026-09-29）：本文后续章节保留接管时点的历史名称与文件路径。当前入口为 `itemark.toml`，自举 root 为 `itemark/`，稳定 ID 与标题文件名已迁为 `IM-数字`；完整旧新映射见 [ID 迁移记录 v1](id-migrations/v1-wl-to-im.md)。
+
 本文档记录八个 v0 记录的形状、到新格式的逐字段映射，以及接管的实际执行结果。第 1–3 节是接管前的源码推导，第 4.0 节是已实测的接管事实。
 
 - 事实来源（源码）：`src/record/mod.rs`、`src/record/markdown.rs`、`src/record/index.rs`、`src/domain/front_matter.rs`、`src/domain/id.rs`、`src/domain/scalar.rs`、`src/kind.rs`、`src/workspace/config.rs`、`src/workspace/mod.rs`、`src/checks.rs`、`src/cli/item.rs`、`src/cli/args.rs`、`src/cli/mod.rs`、`src/cli/config_cmd.rs`。

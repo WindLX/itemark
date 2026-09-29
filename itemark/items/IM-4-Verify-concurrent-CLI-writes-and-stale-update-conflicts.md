@@ -1,0 +1,45 @@
+---
+id: IM-4
+kind: work
+group: 验证
+title: Verify concurrent CLI writes and stale-update conflicts
+status: done
+parent: null
+depends_on:
+- IM-7
+completion_note: 并发写入行为已用真实 CLI 进程验证：并发 add 由项目锁串行化并分配唯一 ID，同一记录并发更新在写入前比对原文，冲突时明确报错而不静默覆盖。
+completion_evidence: tests/concurrency.rs（两个真实 CLI 进程）；just ci 全绿。
+---
+
+# Prevent lost records across concurrent CLI writes
+
+## 目标
+
+Exercise and fix the agreed concurrency cases with real CLI processes. Project locking and unique ID allocation are introduced with the first write in IM-2; this item verifies their behavior and same-item conflict handling.
+
+## 验收
+
+- [ ] Two real CLI processes can write separate records without losing either record.
+- [ ] Concurrent updates to the same item either preserve both appended progress entries or report a clear conflict; neither update is silently lost.
+- [ ] Concurrent record creation yields unique project-wide IDs.
+- [ ] A stale read followed by a write is detected and rejected instead of overwriting newer content.
+- [ ] Checks exercise these cases with multiple CLI processes and report what was actually verified.
+- [ ] Document the boundary: editors outside the CLI are not promised to participate in locking.
+
+## 当前下一步
+
+After IM-7 provides lifecycle and check behavior, exercise these cases with real CLI processes and fix any observed loss or silent overwrite. Locking and unique ID protection must already exist in IM-2.
+
+## 历史进展
+
+- 2026-09-28: Updated after the user confirmed concurrency protection as a first-phase commitment. No conflict handling has been implemented or verified.
+- 2026-09-28: Earlier draft language treated concurrency as conditional; corrected after the user confirmed it as a first-phase commitment. The scope now names same-item append, unique ID creation, and detected stale-write conflicts.
+- 2026-09-28 [用户裁定]: Replanned as IM-4 and depends on IM-7 so validation can exercise the complete write path. Project lock and unique ID protection are introduced in IM-2, not postponed here. Required real-process cases are distinct-item writes, same-item append/clear conflict, unique concurrent IDs, and stale-content rejection.
+
+## 证据
+
+- User-confirmed first-phase requirement relayed in this conversation: prevent loss across concurrent CLI writes and report an error on detected external modification; editors are outside the lock guarantee. Checked 2026-09-28. No concurrency evidence exists yet.
+
+## 进展
+
+- 2026-09-28：已实现并验证：并发 add 由项目锁串行化并分配项目唯一 ID；同一记录并发更新在写入前比对读取到的原始内容，冲突时明确报错而不静默覆盖。对应集成测试在 tests/concurrency.rs，使用两个真实 CLI 进程。边界：外部编辑器不参与该锁。
