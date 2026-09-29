@@ -28,7 +28,7 @@ Itemark 是本地 Rust + Clap 同步 CLI。每个 kind 由项目配置和 Markdo
 | `init` | 为新项目创建 `itemark.toml`、`general` group、可编辑的 `work` / `fact` / `term` kind starter 和 Markdown 模板。已有配置不注入 starter，即使使用 `--force`。 |
 | `add` | 按指定 kind 添加记录；可暂缺必填内容，稳定 ID 由 Itemark 分配，文件名同时含 ID 与标题摘要。 |
 | `show` | 按稳定 ID 查看一条记录。 |
-| `list` | 列出记录，可按 kind、状态或 group 过滤；例如工作事项用 `itemark list --status in_progress` 或 `--status todo`。 |
+| `list` | 列出记录，可按 kind、状态或 group 过滤；例如工作事项用 `itemark list --status in_progress` 或 `--status todo`。这三个筛选选项可重复。 |
 | `search` | 搜索当前记录内容；引用通过稳定 ID 跨 group 指向原记录。 |
 | `update` | 定点更新字段或指定正文节；也可移动记录到另一个 group。 |
 | `log` | 即时追加一条带日期的进展记录。 |
@@ -65,6 +65,8 @@ Itemark 是本地 Rust + Clap 同步 CLI。每个 kind 由项目配置和 Markdo
 ## 记录行为
 
 记录采用 YAML 头部和 Markdown 正文。`update` 只改指定字段或正文节，保留其余正文；不承诺 YAML 原文顺序或空白的逐字往返。每条记录恰属一个一级 group；group 可混合 kind，不嵌套。移动改变归属但不改变稳定 ID，引用按 ID 工作，不复制被引用内容。
+
+`list` 的 `--group`、`--kind` 和 `--status` 可各自重复指定。同一字段的多个值按 OR 匹配，不同字段之间按 AND 组合；重复的同值只参与一次筛选。逗号是普通字面字符，不会拆成多个值。例如 `itemark list --status todo --status in_progress --kind work` 表示状态为 `todo` 或 `in_progress`，且 kind 为 `work`。此多值筛选只适用于 `list`，不扩展 `search`、`summary` 或按 ID 定位/编辑的参数。
 
 普通写入即校验 `parent`、`depends_on` 指向的 ID 存在且不是自引用：`depends_on` 可用 `[IM-42, IM-43]` 或 `IM-42,IM-43` 的列表写法，`parent` 只接受单个 ID。
 
