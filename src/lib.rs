@@ -1,4 +1,4 @@
-//! Worklog：以稳定 ID 管理工作事项、事实与术语的本地 CLI。
+//! Itemark：以稳定 ID 管理工作事项、事实与术语的本地 CLI。
 //!
 //! 模块按职责分层：
 //!
@@ -13,6 +13,7 @@ pub mod checks;
 pub mod cli;
 pub mod domain;
 pub mod error;
+pub mod i18n;
 pub mod kind;
 pub mod output;
 pub mod record;

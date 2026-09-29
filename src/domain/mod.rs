@@ -5,7 +5,7 @@ pub mod id;
 pub mod scalar;
 pub mod section;
 
-pub use id::{ID_PREFIX, Lifecycle, format_id, id_number};
+pub use id::{ID_PREFIX, LEGACY_ID_PREFIX, Lifecycle, format_id, id_number};
 pub use scalar::Scalar;
 
 /// 记录文件中的一个头部字段。

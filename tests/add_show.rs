@@ -23,9 +23,10 @@ fn add_then_show_a_record_from_a_user_defined_kind() {
         "phase=doing",
         "--json",
     ]);
-    assert_eq!(ids_in(&added), ["WL-0001"], "first project ID is stable");
+    let id = ids_in(&added).first().expect("first project ID").clone();
+    assert_eq!(id, "IM-1", "new IDs use the Itemark prefix without padding");
 
-    let shown = project.ok(&["show", "WL-0001", "--json"]);
+    let shown = project.ok(&["show", &id, "--json"]);
     assert!(shown.contains("跨会话记录"));
     assert!(shown.contains("project-note"));
     assert!(shown.contains("研究"));
@@ -35,12 +36,20 @@ fn add_then_show_a_record_from_a_user_defined_kind() {
 fn show_prints_each_field_once_and_labels_the_header() {
     let project = Project::new();
     project.configure();
-    project.add_work("只打印一次", "todo");
+    let id = project.add_work("只打印一次", "todo");
 
-    let shown = project.ok(&["show", "WL-0001"]);
+    let shown = project.ok(&["show", &id]);
     for label in ["ID：", "kind：", "group：", "标题：", "状态："] {
         assert!(shown.contains(label), "the header is localised: {shown}");
     }
+    assert!(
+        !shown.contains("completion_note："),
+        "blank optional fields stay hidden: {shown}"
+    );
+    assert!(
+        !shown.contains("completion_evidence："),
+        "blank optional fields stay hidden: {shown}"
+    );
     for raw in ["title:", "status:"] {
         assert_eq!(
             shown.matches(raw).count(),

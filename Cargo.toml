@@ -1,7 +1,11 @@
 [package]
-name = "worklog"
+name = "itemark"
 version = "0.1.0"
 edition = "2024"
+description = "A local-first work, fact, and terminology tracker backed by editable Markdown records"
+license = "MIT"
+repository = "https://github.com/WindLX/itemark"
+readme = "README.md"
 
 [dependencies]
 anstyle = "1.0.14"
@@ -12,6 +16,7 @@ pulldown-cmark = "0.13.4"
 serde = { version = "1.0.229", features = ["derive"] }
 serde_json = "1.0.151"
 serde_norway = "0.9.42"
+sys-locale = "0.3.2"
 thiserror = "2.0.21"
 toml = "1.1.6"
 
@@ -20,5 +25,5 @@ criterion = "0.8.2"
 tempfile = "3.27.0"
 
 [[bench]]
-name = "worklog"
+name = "itemark"
 harness = false

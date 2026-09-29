@@ -3,7 +3,7 @@
 //! 使用标准库文件锁，不额外引入锁 crate。锁只约束遵守它的 CLI 进程；文本编辑器
 //! 和其他外部进程不参与该锁，只能靠写入前的内容比对发现部分冲突。
 
-use std::fs::File;
+use std::fs::{File, OpenOptions};
 use std::path::Path;
 use std::time::{Duration, Instant};
 
@@ -13,7 +13,7 @@ use crate::error::{Result, WorkspaceError};
 const LOCK_TIMEOUT: Duration = Duration::from_secs(5);
 const RETRY_INTERVAL: Duration = Duration::from_millis(20);
 
-/// 对可写目录持有排他锁。目录由内核释放锁，不留下需要版本管理的锁文件。
+/// 对项目锁文件持有排他锁。锁状态由内核句柄管理；锁文件本身持久存在，且应被 Git 忽略。
 pub struct ProjectLock {
     file: Option<File>,
 }
@@ -22,13 +22,21 @@ impl ProjectLock {
     pub fn acquire(lock_dir: &Path) -> Result<Self> {
         if !lock_dir.is_dir() {
             return Err(
-                WorkspaceError::runtime("worklog root is not initialised; cannot write")
+                WorkspaceError::runtime("Itemark root is not initialised; cannot write")
                     .at(lock_dir),
             );
         }
-        let file = File::open(lock_dir).map_err(|error| {
-            WorkspaceError::runtime(format!("cannot open lock directory: {error}")).at(lock_dir)
-        })?;
+        let lock_path = lock_dir.join(".itemark.lock");
+        let file = OpenOptions::new()
+            .read(true)
+            .write(true)
+            .create(true)
+            .truncate(false)
+            .open(&lock_path)
+            .map_err(|error| {
+                WorkspaceError::runtime(format!("cannot open project lock file: {error}"))
+                    .at(&lock_path)
+            })?;
 
         let deadline = Instant::now() + LOCK_TIMEOUT;
         loop {
@@ -37,9 +45,9 @@ impl ProjectLock {
                 Err(error) if is_contention(&error) => {
                     if Instant::now() >= deadline {
                         return Err(WorkspaceError::runtime(
-                            "another worklog process is writing to this project; retry shortly",
+                            "another Itemark process is writing to this project; retry shortly",
                         )
-                        .at(lock_dir));
+                        .at(&lock_path));
                     }
                     std::thread::sleep(RETRY_INTERVAL);
                 }
@@ -47,7 +55,7 @@ impl ProjectLock {
                     return Err(WorkspaceError::runtime(format!(
                         "cannot acquire project lock: {error}"
                     ))
-                    .at(lock_dir));
+                    .at(&lock_path));
                 }
             }
         }

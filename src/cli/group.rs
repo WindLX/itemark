@@ -10,7 +10,7 @@ use super::args::{GroupAddArgs, GroupShowArgs};
 
 pub fn list(context: &Context) -> Result<()> {
     let workspace = context.workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let config = workspace.config();
 
     let groups: Vec<serde_json::Value> = config
@@ -63,7 +63,7 @@ pub fn list(context: &Context) -> Result<()> {
 
 pub fn add(context: &Context, args: &GroupAddArgs) -> Result<()> {
     let workspace = context.locked_workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let config = workspace.config();
     if config.has_group(&args.name) {
         return Err(WorkspaceError::usage(format!(
@@ -73,7 +73,7 @@ pub fn add(context: &Context, args: &GroupAddArgs) -> Result<()> {
     }
     if config.kinds.is_empty() && config.groups.is_empty() && config.raw_text.is_empty() {
         return Err(WorkspaceError::runtime(format!(
-            "no {CONFIG_FILE} in this project; run `worklog init` first"
+            "no {CONFIG_FILE} in this project; run `itemark init` first"
         ))
         .at(&config.config_path));
     }
@@ -116,7 +116,7 @@ pub fn add(context: &Context, args: &GroupAddArgs) -> Result<()> {
 
 pub fn show(context: &Context, args: &GroupShowArgs) -> Result<()> {
     let workspace = context.workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let config = workspace.config();
     if !config.has_group(&args.name) {
         return Err(WorkspaceError::usage(format!(

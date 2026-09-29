@@ -42,6 +42,34 @@ fn an_empty_selection_says_so_instead_of_printing_nothing() {
     let searched = project.ok(&["search", "查不到的词"]);
     assert_eq!(searched.trim(), "无匹配记录");
 
-    let en = project.ok(&["--language", "en", "list", "--group", "产品"]);
+    project.write("itemark.toml", &CONFIG.replace("zh-CN", "en"));
+    let en = project.ok(&["list", "--group", "产品"]);
     assert_eq!(en.trim(), "no matching records");
+}
+
+#[test]
+fn long_titles_keep_list_and_summary_metadata_on_separate_lines() {
+    let project = Project::new();
+    project.configure();
+    let title = "这是一个特意写得比较长的标题，用于确认列表中元数据不会被挤到标题后面";
+    let id = project.add_work(title, "in_progress");
+
+    let listed = project.ok(&["list"]);
+    let mut lines = listed.lines();
+    assert_eq!(lines.next(), Some(format!("{id} {title}").as_str()));
+    let metadata = lines.next().expect("metadata line");
+    assert!(
+        metadata.starts_with("  kind：work · group：产品"),
+        "{metadata}"
+    );
+    assert!(metadata.contains("状态：进行中"), "{metadata}");
+
+    let summary = project.ok(&["summary"]);
+    let summary_lines: Vec<_> = summary.lines().collect();
+    assert!(summary_lines[1].starts_with("待办："));
+    assert!(summary_lines[2].starts_with("进行中："), "{summary}");
+    assert!(
+        summary.contains(&format!("- {id} {title}\n  kind：work\n  group：产品")),
+        "{summary}"
+    );
 }

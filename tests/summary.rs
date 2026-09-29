@@ -10,18 +10,18 @@ use common::*;
 fn summary_is_read_only_until_a_snapshot_is_requested() {
     let project = Project::new();
     project.configure();
-    project.add_note("总览来源", "研究");
+    let id = project.add_note("总览来源", "研究");
 
     project.ok(&["summary"]);
     assert!(
-        !project.exists("worklog/summaries"),
+        !project.exists("itemark/summaries"),
         "the overview is not saved unless asked"
     );
 
-    project.ok(&["summary", "--save", "worklog/summaries/handoff.md"]);
-    let snapshot = project.read("worklog/summaries/handoff.md");
+    project.ok(&["summary", "--save", "itemark/summaries/handoff.md"]);
+    let snapshot = project.read("itemark/summaries/handoff.md");
     assert!(snapshot.contains("generated_at"), "{snapshot}");
-    assert!(snapshot.contains("WL-0001"), "{snapshot}");
+    assert!(snapshot.contains(&id), "{snapshot}");
 }
 
 #[test]

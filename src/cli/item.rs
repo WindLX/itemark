@@ -36,7 +36,7 @@ const CANONICAL_SET_KEYS: [&str; 4] = [
 
 pub fn add(context: &Context, args: &AddArgs) -> Result<()> {
     let mut workspace = context.locked_workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let id = workspace.transaction(|transaction| {
         let config = transaction.config();
         let kind = config.require_kind(&args.kind)?;
@@ -78,7 +78,9 @@ pub fn add(context: &Context, args: &AddArgs) -> Result<()> {
         values.insert("kind".to_string(), kind.name.clone());
 
         // 模板是头部字段顺序、默认值与正文骨架的来源；显式取值覆盖模板默认值。
-        let target = config.items_dir().join(format!("{id}.md"));
+        let target = config
+            .items_dir()
+            .join(crate::record::file_name(&id, &title));
         let mut record = match config.template_path(kind) {
             Some(path) => {
                 let text = std::fs::read_to_string(&path)
@@ -131,7 +133,7 @@ pub fn add(context: &Context, args: &AddArgs) -> Result<()> {
 
 pub fn update(context: &Context, args: &UpdateArgs) -> Result<()> {
     let mut workspace = context.locked_workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let expected = workspace.index().require(&args.id)?.raw.clone();
     workspace.transaction(|transaction| {
         let mut record = transaction.current(&args.id)?;
@@ -209,7 +211,7 @@ pub fn update(context: &Context, args: &UpdateArgs) -> Result<()> {
 
 pub fn log(context: &Context, args: &LogArgs) -> Result<()> {
     let mut workspace = context.locked_workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let expected = workspace.index().require(&args.id)?.raw.clone();
     let date = match args.date.as_deref() {
         Some(date) => time::parse_date(date).ok_or_else(|| {
@@ -220,10 +222,16 @@ pub fn log(context: &Context, args: &LogArgs) -> Result<()> {
 
     workspace.transaction(|transaction| {
         let mut record = transaction.current(&args.id)?;
-        let section = args
-            .section
-            .as_deref()
-            .unwrap_or(crate::domain::section::PROGRESS);
+        let section = args.section.as_deref().unwrap_or_else(|| {
+            [crate::domain::section::PROGRESS, "Progress"]
+                .into_iter()
+                .find(|name| record.body.section(name).is_some())
+                .unwrap_or(if crate::i18n::is_english(&language) {
+                    "Progress"
+                } else {
+                    crate::domain::section::PROGRESS
+                })
+        });
         record.body.append_line(
             section,
             &fill(labels(&language).log_note(), &[&date, args.text.trim()]),
@@ -253,7 +261,7 @@ pub fn restore(context: &Context, args: &RestoreArgs) -> Result<()> {
 
 fn lifecycle(context: &Context, id: &str, dropped: bool, reason: Option<&str>) -> Result<()> {
     let mut workspace = context.locked_workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let expected = workspace.index().require(id)?.raw.clone();
     let labels = labels(&language);
     workspace.transaction(|transaction| {
@@ -467,7 +475,7 @@ pub enum ReportScope {
 impl ReportScope {
     fn command(self) -> &'static str {
         match self {
-            Self::Records => "worklog check",
+            Self::Records => "itemark check",
             Self::Kinds => "kind check",
         }
     }
@@ -518,7 +526,8 @@ pub fn print_report(
                 )
             );
             for issue in &report.issues {
-                println!("- {}", paint(style::error(), &issue.to_string()));
+                let message = crate::i18n::localize_diagnostic(&issue.to_string(), language);
+                println!("- {}", paint(style::error(), &message));
             }
         }
     }
@@ -698,6 +707,9 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
             let value = record
                 .get(&field.name)
                 .map_or_else(String::new, Scalar::display);
+            if value.trim().is_empty() && !field.required {
+                continue;
+            }
             push_line(
                 &labels,
                 &mut out,
@@ -732,6 +744,15 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
     }
     // 头部里剩下、前面没有专门打印的字段按原始键输出。
     for (key, value) in &record.fields {
+        let empty_optional = record
+            .kind()
+            .ok()
+            .and_then(|name| config.kind(name))
+            .and_then(|kind| kind.field(key))
+            .is_some_and(|field| !field.required && value.is_empty());
+        if empty_optional {
+            continue;
+        }
         push_line(
             &labels,
             &mut out,
@@ -752,24 +773,33 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
 /// 列表中的一行。
 #[must_use]
 pub fn record_line(language: &str, config: &Config, record: &Record) -> String {
+    let labels = labels(language);
     let kind = record.kind().unwrap_or("");
     let state = crate::status::of(config, record);
-    let status = if state == State::NoStatus {
-        String::new()
-    } else {
-        format!(" · {}", paint(state_style(state), state.as_key()))
-    };
-    let lifecycle = if record.lifecycle().is_dropped() {
-        format!(" · {}", paint(style::muted(), labels(language).dropped()))
-    } else {
-        String::new()
-    };
-    format!(
-        "{} {} · {kind} · {}{status}{lifecycle}",
+    let metadata = format!(
+        "{}{} · {}{}",
+        fill(labels.heading(), &[labels.kind()]),
+        kind,
+        fill(labels.heading(), &[labels.group()]),
+        record.group()
+    );
+    let mut line = format!(
+        "{} {}\n  {}",
         paint(style::accent(), record.id().unwrap_or("")),
         record.title(),
-        record.group()
-    )
+        metadata
+    );
+    if state != State::NoStatus {
+        line.push_str(" · ");
+        line.push_str(&fill(labels.heading(), &[labels.status()]));
+        line.push_str(paint(state_style(state), crate::view::state_label(&labels, state)).as_str());
+    }
+    if record.lifecycle().is_dropped() {
+        line.push_str(" · ");
+        line.push_str(&fill(labels.heading(), &[labels.lifecycle()]));
+        line.push_str(labels.dropped());
+    }
+    line
 }
 
 /// 状态在文本输出里的样式：完成绿、阻塞红、未验证黄、进行中青；待办与无状态不着色。

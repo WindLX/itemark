@@ -425,6 +425,25 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a6cb138bb79a146c1bd460005623e142ef0181e3d0219cb493e02f7d08a35695"
 
 [[package]]
+name = "itemark"
+version = "0.1.0"
+dependencies = [
+ "anstyle",
+ "chrono",
+ "clap",
+ "criterion",
+ "libc",
+ "pulldown-cmark",
+ "serde",
+ "serde_json",
+ "serde_norway",
+ "sys-locale",
+ "tempfile",
+ "thiserror",
+ "toml",
+]
+
+[[package]]
 name = "itertools"
 version = "0.13.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -777,6 +796,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "sys-locale"
+version = "0.3.2"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8eab9a99a024a169fe8a903cf9d4a3b3601109bcc13bd9e3c6fff259138626c4"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "tempfile"
 version = "3.27.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1057,24 +1085,6 @@ name = "winnow"
 version = "1.0.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "23b97319f7b8343df12cc98938e5c3eb436064524c8d2b4e30a1d3a36eecdf81"
-
-[[package]]
-name = "worklog"
-version = "0.1.0"
-dependencies = [
- "anstyle",
- "chrono",
- "clap",
- "criterion",
- "libc",
- "pulldown-cmark",
- "serde",
- "serde_json",
- "serde_norway",
- "tempfile",
- "thiserror",
- "toml",
-]
 
 [[package]]
 name = "zerocopy"

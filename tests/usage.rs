@@ -73,7 +73,8 @@ fn references_must_point_at_existing_records() {
     ]);
     assert_eq!(code, 2, "an unknown dependency is refused: {output}");
 
-    let (code, output) = project.fail(&["update", "WL-0001", "--set", "parent=WL-0001"]);
+    let id = project.add_work("自引用检查", "todo");
+    let (code, output) = project.fail(&["update", &id, "--set", &format!("parent={id}")]);
     assert_eq!(code, 2, "a record cannot depend on itself: {output}");
 }
 
@@ -119,7 +120,7 @@ fn depends_on_takes_a_list_and_parent_stays_single() {
     assert_eq!(code, 2, "`parent` takes a single record ID: {output}");
 }
 
-/// 读取端提前关闭管道时（`worklog show <ID> | head`），进程应当安静结束，
+/// 读取端提前关闭管道时（`itemark show <ID> | head`），进程应当安静结束，
 /// 而不是让 `println!` 抛出 Rust panic。
 #[cfg(unix)]
 #[test]
@@ -132,7 +133,7 @@ fn a_closed_pipe_ends_quietly_instead_of_panicking() {
     // 正文远大于管道缓冲区，保证读取端退出后写入必然失败。
     let body = "x".repeat(256 * 1024);
     project.write(
-        "worklog/items/WL-0001.md",
+        "itemark/items/WL-0001.md",
         &format!(
             "---\nid: WL-0001\nkind: project-note\ngroup: 研究\ntitle: 大记录\nphase: doing\n---\n\n## 目标\n\n{body}\n"
         ),

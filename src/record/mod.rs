@@ -176,6 +176,25 @@ impl Record {
     }
 }
 
+/// Build a stable-ID-prefixed record filename with a filesystem-safe title component.
+#[must_use]
+pub fn file_name(id: &str, title: &str) -> String {
+    let mut title_part = String::new();
+    for character in title.chars() {
+        if character.is_alphanumeric() || character == '_' || character == '-' {
+            title_part.push(character);
+        } else if !title_part.is_empty() && !title_part.ends_with('-') {
+            title_part.push('-');
+        }
+    }
+    let title_part = title_part.trim_matches('-');
+    if title_part.is_empty() {
+        format!("{id}.md")
+    } else {
+        format!("{id}-{title_part}.md")
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

@@ -14,7 +14,7 @@ use super::args::SummaryArgs;
 /// `view::handoff_json`，不会退化成默认总览。
 pub fn summary(context: &Context, args: &SummaryArgs) -> Result<()> {
     let workspace = context.workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let generated_at = args.at.clone().unwrap_or_else(crate::time::now_iso);
     let overview = view::build(&workspace, generated_at);
 

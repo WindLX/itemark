@@ -4,7 +4,6 @@
 //! `show`、`list`、`summary` 与 `check` 都经由本模块，不再各自解释 kind 声明。
 //! 判定只依赖配置与记录本身，不做 I/O。
 
-use crate::domain::section;
 use crate::record::Record;
 use crate::workspace::{Config, KindConfig};
 
@@ -124,10 +123,10 @@ pub fn completion_gaps(config: &Config, record: &Record) -> Vec<String> {
     }
     let mut missing = Vec::new();
     if note.trim().is_empty() {
-        missing.push(section::COMPLETION.to_string());
+        missing.push("completion_note".to_string());
     }
     if record.completion_evidence().trim().is_empty() {
-        missing.push(section::EVIDENCE.to_string());
+        missing.push("completion_evidence".to_string());
     }
     missing
 }

@@ -27,12 +27,12 @@ fn check_reports_missing_sections_and_completion_evidence() {
     project.ok(&["update", &work, "--section", "目标=做完了"]);
     project.ok(&["check", &work]);
 
-    let path = format!("worklog/items/{work}.md");
-    let hand_edited = project
-        .read(&path)
+    let path = project.item_file(&work);
+    let hand_edited = fs::read_to_string(&path)
+        .expect("read work record")
         .replace("status: \"todo\"", "status: \"done\"")
         .replace("status: todo", "status: done");
-    project.write(&path, &hand_edited);
+    fs::write(&path, &hand_edited).expect("write work record");
 
     let (code, output) = project.fail(&["check", &work]);
     assert_eq!(
@@ -74,7 +74,7 @@ fn unverified_completion_is_counted_separately_in_the_overview() {
 
     let text = project.ok(&["summary"]);
     assert!(
-        text.contains("WL-"),
+        text.contains("IM-"),
         "the overview names its sources: {text}"
     );
 }
@@ -83,10 +83,10 @@ fn unverified_completion_is_counted_separately_in_the_overview() {
 fn check_requires_only_the_fields_the_kind_declares() {
     let project = Project::new();
     project.write(
-        "worklog.toml",
+        "itemark.toml",
         r#"
 language = "zh-CN"
-root = "worklog"
+root = "itemark"
 
 [[groups]]
 name = "研究"
@@ -111,19 +111,19 @@ fields = [
 "#,
     );
     project.write(
-        "worklog/templates/note.md",
+        "itemark/templates/note.md",
         "---\nid: \"{{id}}\"\nkind: \"note\"\ngroup: \"{{group}}\"\n---\n## 目标\n\n",
     );
     project.write(
-        "worklog/templates/task.md",
+        "itemark/templates/task.md",
         "---\nid: \"{{id}}\"\nkind: \"task\"\ngroup: \"{{group}}\"\ntitle: \"{{title}}\"\n---\n## 目标\n\n",
     );
     project.write(
-        "worklog/items/WL-0001.md",
+        "itemark/items/WL-0001.md",
         "---\nid: \"WL-0001\"\nkind: \"note\"\ngroup: \"研究\"\n---\n\n## 目标\n\n没有标题也算完整。\n",
     );
     project.write(
-        "worklog/items/WL-0002.md",
+        "itemark/items/WL-0002.md",
         "---\nid: \"WL-0002\"\nkind: \"task\"\ngroup: \"研究\"\n---\n\n## 目标\n\n缺了必填标题。\n",
     );
 
@@ -138,10 +138,10 @@ fields = [
 fn kind_check_uses_the_same_report_as_check() {
     let project = Project::new();
     project.write(
-        "worklog.toml",
+        "itemark.toml",
         r#"
 language = "zh-CN"
-root = "worklog"
+root = "itemark"
 
 [[groups]]
 name = "研究"
@@ -160,7 +160,7 @@ fields = [
 "#,
     );
     project.write(
-        "worklog/templates/work.md",
+        "itemark/templates/work.md",
         "---\nid: \"{{id}}\"\nkind: \"work\"\ngroup: \"{{group}}\"\ntitle: \"{{title}}\"\nstatus: \"todo\"\n---\n## 目标\n\n",
     );
 

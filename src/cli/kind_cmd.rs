@@ -16,7 +16,7 @@ use super::item;
 
 pub fn list(context: &Context) -> Result<()> {
     let workspace = context.workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let config = workspace.config();
     if context.mode.is_json() {
         print_json(&serde_json::json!({
@@ -62,7 +62,7 @@ pub fn list(context: &Context) -> Result<()> {
 
 pub fn show(context: &Context, args: &KindShowArgs) -> Result<()> {
     let workspace = context.workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let config = workspace.config();
 
     let kinds: Vec<&KindConfig> = match args.name.as_deref() {
@@ -179,7 +179,7 @@ pub fn show(context: &Context, args: &KindShowArgs) -> Result<()> {
 
 pub fn check(context: &Context, args: &KindCheckArgs) -> Result<()> {
     let workspace = context.workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let config = workspace.config();
 
     let kinds: Vec<&KindConfig> = match args.name.as_deref() {

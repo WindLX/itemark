@@ -53,18 +53,59 @@ fn built_in_help_text_is_localized() {
     assert!(project.ok(&["help", "add"]).contains("--kind <kind 名称>"));
 }
 
-/// 帮助文案固定在编译期，不随项目语言切换（`docs/cli.md` 的边界说明）。
 #[test]
-fn help_text_does_not_follow_the_project_language() {
+fn help_text_follows_project_language() {
     let project = Project::new();
-
-    let translated = project.ok(&["--language", "en", "--help"]);
-    assert!(translated.contains("用法："), "{translated}");
-    assert!(translated.contains("打印帮助"), "{translated}");
-    for english in ENGLISH_SCAFFOLDING {
+    project.write("itemark.toml", &CONFIG.replace("zh-CN", "en"));
+    let help = project.ok(&["--help"]);
+    for chinese in ["用法：", "全局选项", "打印帮助", "打印版本", "初始化项目"]
+    {
         assert!(
-            !translated.contains(english),
-            "帮助不随 `--language` 切换，但仍出现 `{english}`：{translated}"
+            !help.contains(chinese),
+            "help should be English; found {chinese}: {help}"
+        );
+    }
+    for english in [
+        "Usage:",
+        "Commands",
+        "Options",
+        "Global options",
+        "Print help",
+        "Initialize project",
+        "Show this help message",
+    ] {
+        assert!(
+            help.contains(english),
+            "help should contain {english}: {help}"
+        );
+    }
+    assert!(
+        !help.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)),
+        "{help}"
+    );
+    let subcommand = project.ok(&["group", "add", "--help"]);
+    assert!(
+        subcommand.contains("Create a top-level group"),
+        "{subcommand}"
+    );
+    assert!(!subcommand.contains("一级 group"), "{subcommand}");
+    assert!(
+        !subcommand
+            .chars()
+            .any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)),
+        "{subcommand}"
+    );
+    for args in [
+        vec!["add", "--help"],
+        vec!["update", "--help"],
+        vec!["kind", "check", "--help"],
+        vec!["help", "add"],
+    ] {
+        let help = project.ok(&args);
+        assert!(
+            !help.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c)),
+            "{}: {help}",
+            args.join(" ")
         );
     }
 }

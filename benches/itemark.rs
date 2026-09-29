@@ -16,18 +16,18 @@ use std::fs;
 use std::path::{Path, PathBuf};
 
 use criterion::{BatchSize, BenchmarkId, Criterion, Throughput, criterion_group, criterion_main};
+use itemark::kind::render_template;
+use itemark::record::Record;
+use itemark::record::index::ItemIndex;
+use itemark::workspace::Workspace;
 use tempfile::TempDir;
-use worklog::kind::render_template;
-use worklog::record::Record;
-use worklog::record::index::ItemIndex;
-use worklog::workspace::Workspace;
 
 /// 规模梯度：覆盖小项目到需要留意规模的项目。
 const SIZES: [usize; 3] = [50, 200, 800];
 
 const CONFIG: &str = r#"
 language = "zh-CN"
-root = "worklog"
+root = "itemark"
 
 [[groups]]
 name = "产品"
@@ -49,15 +49,15 @@ const TEMPLATE: &str = "---\nid: \"{{id}}\"\nkind: \"work\"\ngroup: \"{{group}}\
 
 fn fixture() -> TempDir {
     let dir = TempDir::new().expect("create benchmark project");
-    fs::write(dir.path().join("worklog.toml"), CONFIG).expect("write worklog.toml");
-    let templates = dir.path().join("worklog/templates");
+    fs::write(dir.path().join("itemark.toml"), CONFIG).expect("write itemark.toml");
+    let templates = dir.path().join("itemark/templates");
     fs::create_dir_all(&templates).expect("create templates directory");
     fs::write(templates.join("work.md"), TEMPLATE).expect("write template");
     dir
 }
 
 fn config_path(dir: &Path) -> PathBuf {
-    dir.join("worklog.toml")
+    dir.join("itemark.toml")
 }
 
 /// 一条记录的最小正文，形状与模板渲染结果一致。
@@ -73,11 +73,11 @@ fn record_text(id: &str, title: &str, depends_on: Option<&str>) -> String {
 
 /// 铺 `count` 条记录，每条依赖前一条，让引用校验有真实的引用图可走。
 fn seed(dir: &Path, count: usize) {
-    let items = dir.join("worklog/items");
+    let items = dir.join("itemark/items");
     fs::create_dir_all(&items).expect("create items directory");
     for index in 1..=count {
-        let id = format!("WL-{index:04}");
-        let previous = (index > 1).then(|| format!("WL-{:04}", index - 1));
+        let id = format!("IM-{index}");
+        let previous = (index > 1).then(|| format!("IM-{}", index - 1));
         let text = record_text(&id, &format!("基准记录 {index}"), previous.as_deref());
         fs::write(items.join(format!("{id}.md")), text).expect("write record");
     }
@@ -128,7 +128,7 @@ fn bench_read(c: &mut Criterion) {
         seed(dir.path(), count);
         let workspace = Workspace::open(&config_path(dir.path()), None).expect("open workspace");
         let items = workspace.config().items_dir();
-        let path = items.join(format!("WL-{count:04}.md"));
+        let path = items.join(format!("IM-{count}.md"));
 
         group.throughput(Throughput::Elements(count as u64));
         group.bench_function(BenchmarkId::new("index_scan", count), |b| {
@@ -141,7 +141,7 @@ fn bench_read(c: &mut Criterion) {
     group.finish();
 }
 
-/// 校验：全项目检查，引用校验在 WL-0012 后应按 ID 建表查找。
+/// 校验：全项目检查，引用校验在 IM-12 后应按 ID 建表查找。
 fn bench_check(c: &mut Criterion) {
     let mut group = c.benchmark_group("check");
     group.sample_size(30);
@@ -150,13 +150,13 @@ fn bench_check(c: &mut Criterion) {
         seed(dir.path(), count);
         let workspace = Workspace::open(&config_path(dir.path()), None).expect("open workspace");
         assert!(
-            worklog::checks::check_all(&workspace).is_ok(),
+            itemark::checks::check_all(&workspace).is_ok(),
             "the fixture must pass its own checks"
         );
 
         group.throughput(Throughput::Elements(count as u64));
         group.bench_function(BenchmarkId::new("all_records", count), |b| {
-            b.iter(|| worklog::checks::check_all(&workspace));
+            b.iter(|| itemark::checks::check_all(&workspace));
         });
     }
     group.finish();

@@ -7,12 +7,12 @@
 
 // 再导出，让每个测试文件只需 `use common::*;`。
 pub use std::fs;
-pub use std::path::Path;
+pub use std::path::{Path, PathBuf};
 pub use std::process::{Command, Output, Stdio};
 
 pub use tempfile::TempDir;
 
-/// 一个临时 Worklog 项目，测试结束后自动清理。
+/// 一个临时 Itemark 项目，测试结束后自动清理。
 pub struct Project {
     dir: TempDir,
 }
@@ -44,27 +44,41 @@ impl Project {
         self.path().join(relative).exists()
     }
 
+    /// Find the current filename by its stable YAML ID, even when the title changes the path.
+    pub fn item_file(&self, id: &str) -> PathBuf {
+        for entry in fs::read_dir(self.path().join("itemark/items")).expect("read items") {
+            let path = entry.expect("item entry").path();
+            let Ok(record) = itemark::record::Record::read(&path) else {
+                continue;
+            };
+            if record.id().ok() == Some(id) {
+                return path;
+            }
+        }
+        panic!("record {id} does not exist");
+    }
+
     /// 写入一个带自定义 kind 的完整项目。
     pub fn configure(&self) {
-        self.write("worklog.toml", CONFIG);
+        self.write("itemark.toml", CONFIG);
         self.write(
-            "worklog/templates/project-note.md",
+            "itemark/templates/project-note.md",
             "---\nid: \"{{id}}\"\nkind: \"project-note\"\ngroup: \"{{group}}\"\ntitle: \"{{title}}\"\nphase: \"{{phase}}\"\n---\n## 目标\n\n",
         );
         self.write(
-            "worklog/templates/work.md",
+            "itemark/templates/work.md",
             "---\nid: \"{{id}}\"\nkind: \"work\"\ngroup: \"{{group}}\"\ntitle: \"{{title}}\"\nstatus: \"{{status}}\"\n---\n## 目标\n\n## 进展\n\n",
         );
     }
 
     pub fn command(&self) -> Command {
-        let mut command = Command::new(env!("CARGO_BIN_EXE_worklog"));
+        let mut command = Command::new(env!("CARGO_BIN_EXE_itemark"));
         command.current_dir(self.path());
         command
     }
 
     pub fn run(&self, args: &[&str]) -> Output {
-        self.command().args(args).output().expect("run worklog CLI")
+        self.command().args(args).output().expect("run Itemark CLI")
     }
 
     /// 运行并断言成功，返回标准输出。
@@ -126,7 +140,7 @@ impl Project {
 
 pub const CONFIG: &str = r#"
 language = "zh-CN"
-root = "worklog"
+root = "itemark"
 
 [[groups]]
 name = "研究"
@@ -162,9 +176,12 @@ pub fn ids_in(text: &str) -> Vec<String> {
     let mut ids: Vec<String> = text
         .split(|ch: char| !(ch.is_ascii_alphanumeric() || ch == '-'))
         .filter(|token| {
-            token.len() == 7
-                && token.starts_with("WL-")
-                && token[3..].chars().all(|ch| ch.is_ascii_digit())
+            let digits = token
+                .strip_prefix("IM-")
+                .or_else(|| token.strip_prefix("WL-"));
+            digits.is_some_and(|digits| {
+                !digits.is_empty() && digits.chars().all(|ch| ch.is_ascii_digit())
+            })
         })
         .map(str::to_string)
         .collect();

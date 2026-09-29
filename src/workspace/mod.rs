@@ -73,8 +73,8 @@ impl Workspace {
     }
 
     #[must_use]
-    pub fn project_language(&self, cli: Option<&str>) -> String {
-        self.config.effective_language(cli)
+    pub fn project_language(&self) -> String {
+        self.config.language.clone()
     }
 
     /// 在同一项目锁内完成一次写入，结束后重建索引。
@@ -128,7 +128,7 @@ impl Transaction<'_> {
             .workspace
             .index()
             .find(id)
-            .ok_or_else(|| WorkspaceError::usage(format!("unknown worklog item `{id}`")))?;
+            .ok_or_else(|| WorkspaceError::usage(format!("unknown Itemark item `{id}`")))?;
         Ok(record.path.clone())
     }
 
@@ -147,10 +147,18 @@ impl Transaction<'_> {
     pub fn create(&mut self, id: &str, text: &str) -> Result<PathBuf> {
         if self.workspace.index().id_taken(id) {
             return Err(WorkspaceError::usage(format!(
-                "worklog item `{id}` already exists"
+                "Itemark item `{id}` already exists"
             )));
         }
-        let path = self.workspace.config.items_dir().join(format!("{id}.md"));
+        let items_dir = self.workspace.config.items_dir();
+        let draft = Record::parse(&items_dir.join(format!("{id}.md")), text.to_string())?;
+        if draft.id()? != id {
+            return Err(WorkspaceError::usage(format!(
+                "record ID `{}` does not match allocated ID `{id}`",
+                draft.id()?
+            )));
+        }
+        let path = items_dir.join(crate::record::file_name(id, draft.title()));
         if path.exists() {
             return Err(
                 WorkspaceError::runtime(format!("file already exists for `{id}`")).at(&path),
@@ -163,21 +171,45 @@ impl Transaction<'_> {
 
     /// 覆盖一条既有记录；`expected` 是本次操作开始时读到的内容，用于发现外部改动。
     pub fn update(&mut self, id: &str, expected: Option<&str>, text: &str) -> Result<PathBuf> {
-        let path = self.item_path(id)?;
+        let old_path = self.item_path(id)?;
         if let Some(expected) = expected {
-            let current = std::fs::read_to_string(&path)
-                .map_err(|error| crate::error::read_error(&path, error))?;
+            let current = std::fs::read_to_string(&old_path)
+                .map_err(|error| crate::error::read_error(&old_path, error))?;
             if current != expected {
                 return Err(WorkspaceError::runtime(format!(
-                    "worklog item `{id}` changed outside this operation; \
+                    "Itemark item `{id}` changed outside this operation; \
                      re-read it and retry (use --force to overwrite anyway)"
                 ))
-                .at(&path));
+                .at(&old_path));
             }
         }
-        write_new(&path, text)?;
-        self.workspace.note_written(&path, text)?;
-        Ok(path)
+        let draft = Record::parse(&old_path, text.to_string())?;
+        if draft.id()? != id {
+            return Err(WorkspaceError::usage(format!(
+                "record ID `{}` does not match update target `{id}`",
+                draft.id()?
+            )));
+        }
+        let new_path = self
+            .workspace
+            .config
+            .items_dir()
+            .join(crate::record::file_name(id, draft.title()));
+        if new_path != old_path && new_path.exists() {
+            return Err(
+                WorkspaceError::runtime(format!("file already exists for `{id}`")).at(&new_path),
+            );
+        }
+        write_new(&new_path, text)?;
+        if new_path != old_path {
+            if let Err(error) = std::fs::remove_file(&old_path) {
+                let _ = std::fs::remove_file(&new_path);
+                return Err(WorkspaceError::from(error).at(&old_path));
+            }
+            self.workspace.index.remove_path(&old_path);
+        }
+        self.workspace.note_written(&new_path, text)?;
+        Ok(new_path)
     }
 }
 

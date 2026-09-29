@@ -29,8 +29,8 @@ fn drop_and_restore_keep_the_id_and_the_business_status() {
     assert!(restored.contains("in_progress"), "the status is preserved");
     assert!(restored.contains(&id), "the ID is preserved");
     assert!(
-        project
-            .read("worklog/items/WL-0001.md")
+        fs::read_to_string(project.item_file(&id))
+            .expect("read record")
             .contains("不再推进"),
         "the drop reason stays in the history"
     );

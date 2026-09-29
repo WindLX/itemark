@@ -115,7 +115,7 @@ fn completion_is_checked_only_when_this_write_sets_it() {
     let project = Project::new();
     project.configure();
     project.write(
-        "worklog/items/WL-0001.md",
+        "itemark/items/WL-0001.md",
         "---\nid: \"WL-0001\"\nkind: \"work\"\ngroup: \"研究\"\ntitle: \"手写记录\"\nstatus: \"done\"\n---\n\n## 目标\n\n手写。\n",
     );
 

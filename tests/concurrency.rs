@@ -55,7 +55,7 @@ fn concurrent_adds_allocate_unique_ids() {
         4,
         "every concurrent add gets its own ID: {ids:?}"
     );
-    let files = fs::read_dir(project.path().join("worklog/items"))
+    let files = fs::read_dir(project.path().join("itemark/items"))
         .expect("read items directory")
         .count();
     assert_eq!(files, 4, "no record is lost");
@@ -91,7 +91,7 @@ fn concurrent_updates_never_silently_lose_progress() {
         .into_iter()
         .map(|child| child.wait_with_output().expect("wait for the log"))
         .collect();
-    let body = project.read("worklog/items/WL-0001.md");
+    let body = fs::read_to_string(project.item_file(&id)).expect("read record");
 
     for (text, output) in ["甲", "乙"].iter().zip(&results) {
         assert!(

@@ -14,9 +14,9 @@ const ESC: &str = "\u{1b}[";
 fn color_always_styles_text_and_never_keeps_it_plain() {
     let project = Project::new();
     project.configure();
-    project.add_work("着色", "in_progress");
+    let id = project.add_work("着色", "in_progress");
 
-    let plain = project.ok(&["show", "WL-0001", "--color", "never"]);
+    let plain = project.ok(&["show", &id, "--color", "never"]);
     assert!(
         plain.contains("标题："),
         "text output is unchanged: {plain}"
@@ -26,13 +26,13 @@ fn color_always_styles_text_and_never_keeps_it_plain() {
         "--color never must stay plain: {plain:?}"
     );
 
-    let colored = project.ok(&["show", "WL-0001", "--color", "always"]);
+    let colored = project.ok(&["show", &id, "--color", "always"]);
     assert!(
         colored.contains(ESC),
         "--color always must emit ANSI escapes: {colored:?}"
     );
     assert!(
-        colored.contains("WL-0001"),
+        colored.contains(&id),
         "styling keeps the payload readable: {colored:?}"
     );
 }
@@ -41,9 +41,9 @@ fn color_always_styles_text_and_never_keeps_it_plain() {
 fn auto_stays_plain_when_stdout_is_not_a_terminal() {
     let project = Project::new();
     project.configure();
-    project.add_work("默认", "todo");
+    let id = project.add_work("默认", "todo");
 
-    let output = project.ok(&["show", "WL-0001", "--color", "auto"]);
+    let output = project.ok(&["show", &id, "--color", "auto"]);
     assert!(
         !output.contains(ESC),
         "auto must not style piped output: {output:?}"
@@ -54,14 +54,14 @@ fn auto_stays_plain_when_stdout_is_not_a_terminal() {
 fn an_explicit_always_wins_over_no_color() {
     let project = Project::new();
     project.configure();
-    project.add_work("覆盖", "todo");
+    let id = project.add_work("覆盖", "todo");
 
     let output = project
         .command()
         .env("NO_COLOR", "1")
-        .args(["show", "WL-0001", "--color", "always"])
+        .args(["show", &id, "--color", "always"])
         .output()
-        .expect("run worklog CLI");
+        .expect("run Itemark CLI");
     assert!(output.status.success());
     let text = String::from_utf8(output.stdout).expect("stdout is UTF-8");
     assert!(
@@ -74,9 +74,9 @@ fn an_explicit_always_wins_over_no_color() {
 fn json_output_is_never_styled() {
     let project = Project::new();
     project.configure();
-    project.add_work("JSON", "todo");
+    let id = project.add_work("JSON", "todo");
 
-    let json = project.ok(&["show", "WL-0001", "--json", "--color", "always"]);
+    let json = project.ok(&["show", &id, "--json", "--color", "always"]);
     assert!(
         !json.contains(ESC),
         "JSON must stay machine-readable: {json:?}"

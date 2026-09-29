@@ -31,95 +31,47 @@ pub fn print_json(value: &serde_json::Value) -> Result<()> {
     Ok(())
 }
 
-/// 人读输出的栏目标签；本库默认简体中文。
-pub struct Labels(&'static str);
+/// 人读输出文案访问器，值由随程序打包的静态 JSON 词典提供。
+pub struct Labels {
+    english: bool,
+}
+
+impl Labels {
+    fn get(&self, key: &str) -> &'static str {
+        crate::i18n::text(key, if self.english { "en" } else { "zh-CN" })
+    }
+}
 
 macro_rules! labels {
-    ($($field:ident => $zh:literal, $en:literal;)*) => {
-        impl Labels {
-            $(pub fn $field(&self) -> &'static str {
-                match self.0 {
-                    "en" => $en,
-                    _ => $zh,
-                }
-            })*
-        }
+    ($($field:ident => $key:literal;)*) => {
+        impl Labels { $(pub fn $field(&self) -> &'static str { self.get($key) })* }
     };
 }
 
 labels! {
-    id => "ID", "ID";
-    kind => "kind", "kind";
-    group => "group", "group";
-    title => "标题", "title";
-    status => "状态", "status";
-    parent => "父项", "parent";
-    depends_on => "前置依赖", "depends_on";
-    completion => "完成依据", "completion";
-    completion_note => "完成说明", "completion note";
-    completion_evidence => "证据", "evidence";
-    body => "正文", "body";
-    lifecycle => "生命周期", "lifecycle";
-    active => "有效", "active";
-    dropped => "已废弃", "dropped";
-    items => "记录", "items";
-    records => "记录数", "records";
-    overview => "当前总览", "current overview";
-    handoff_title => "交接摘要", "handoff";
-    generated_at => "生成时点", "generated at";
-    sources => "来源记录", "sources";
-    in_progress => "进行中", "in progress";
-    blocked => "阻塞", "blocked";
-    unverified => "完成但未验证", "done but unverified";
-    todo => "待办", "todo";
-    done => "已完成", "done";
-    no_status => "无业务状态", "no status";
-    next_step => "下一步", "next step";
-    dropped_items => "已废弃记录", "dropped records";
-    groups => "分组", "groups";
-    kinds => "kind 定义", "kinds";
-    fields => "字段", "fields";
-    required_sections => "必填分节", "required sections";
-    template => "模板", "template";
-    description => "说明", "description";
-    issues => "问题", "issues";
-    checked => "检查记录数", "records checked";
-    checked_kinds => "检查 kind 数", "kinds checked";
-    ok => "检查通过", "check passed";
-    saved => "已保存", "saved";
-    updated => "已更新", "updated";
-    created => "已创建", "created";
-    init_line => "{} {}（root = {}）", "{} {} (root = {})";
-    next_step_hint => "下一步：在 {} 中声明 kind 与 group", "Next: declare kinds and groups in {}";
-    kind_summary => "- {}（{} 个字段）", "- {} ({} fields)";
-    group_summary => "- {}（{} 条记录）", "- {} ({} records)";
-    template_line => "{}：{}（{}）", "{}: {} ({})";
-    present => "存在", "present";
-    missing => "缺失", "missing";
-    required_marker => "（必填）", " (required)";
-    list_separator => "、", ", ";
-    dropped_note => "- {}：废弃（{}）", "- {}: dropped ({})";
-    line => "{}：{}", "{}: {}";
-    heading => "{}：", "{}:";
-    record_line => "{}：{}\n", "{}: {}\n";
-    log_note => "- {}：{}", "- {}: {}";
-    body_block => "\n{}：\n{}", "\n{}:\n{}";
-    heading_count => "\n## {}（{}）\n", "\n## {} ({})\n";
-    counts_paren => "（{}：{}）\n", "({}: {})\n";
-    indented_line => "  {}：{}\n", "  {}: {}\n";
-    source_line => "\n{}：{}\n", "\n{}: {}\n";
-    issue_line => "- {}：{}\n", "- {}: {}\n";
-    group_created => "{} group {}（{}）", "{} group {} ({})";
-    field_line => "- {}：{}{}{}", "- {}: {}{}{}";
-    no_matches => "无匹配记录", "no matching records";
+    id => "id"; kind => "kind"; group => "group"; title => "title"; status => "status";
+    parent => "parent"; depends_on => "depends_on"; completion => "completion";
+    completion_note => "completion_note"; completion_evidence => "completion_evidence";
+    body => "body"; lifecycle => "lifecycle"; active => "active"; dropped => "dropped";
+    items => "items"; records => "records"; overview => "overview"; handoff_title => "handoff_title";
+    generated_at => "generated_at"; sources => "sources"; in_progress => "in_progress";
+    blocked => "blocked"; unverified => "unverified"; todo => "todo"; done => "done";
+    no_status => "no_status"; next_step => "next_step"; dropped_items => "dropped_items";
+    groups => "groups"; kinds => "kinds"; fields => "fields"; required_sections => "required_sections";
+    template => "template"; description => "description"; issues => "issues"; checked => "checked";
+    checked_kinds => "checked_kinds"; ok => "ok"; saved => "saved"; updated => "updated";
+    created => "created"; init_line => "init_line"; next_step_hint => "next_step_hint";
+    kind_summary => "kind_summary"; group_summary => "group_summary"; template_line => "template_line";
+    present => "present"; missing => "missing"; required_marker => "required_marker";
+    list_separator => "list_separator"; dropped_note => "dropped_note"; line => "line"; heading => "heading";
+    record_line => "record_line"; log_note => "log_note"; body_block => "body_block";
+    heading_count => "heading_count"; counts_paren => "counts_paren"; indented_line => "indented_line";
+    source_line => "source_line"; issue_line => "issue_line"; group_created => "group_created";
+    field_line => "field_line"; no_matches => "no_matches";
 }
 
 /// 用语言相关的句子模板渲染人读文本：模板里的 `{}` 按顺序被 `parts` 填充。
-///
-/// 模板来自 [`Labels`]，所以一句完整的话只有一处定义；命令实现不再自己拼接面向使用者的
-/// 中文句子。例外是 `--help` 与用法说明：那些文案固定在 `src/cli/args.rs` 的参数声明与
-/// [`crate::cli::args::localized_command`] 里，随命令树一起在编译期确定，不随 `--language`
-/// 切换。
+/// 文案来自随二进制打包的 JSON 词典。
 #[must_use]
 pub fn fill(template: &str, parts: &[&str]) -> String {
     let mut rendered = String::with_capacity(template.len() + 16);
@@ -139,10 +91,8 @@ pub fn fill(template: &str, parts: &[&str]) -> String {
 
 #[must_use]
 pub fn labels(language: &str) -> Labels {
-    if language.eq_ignore_ascii_case("en") || language.to_lowercase().starts_with("en-") {
-        Labels("en")
-    } else {
-        Labels("zh")
+    Labels {
+        english: crate::i18n::is_english(language),
     }
 }
 

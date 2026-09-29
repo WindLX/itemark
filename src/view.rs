@@ -116,16 +116,20 @@ fn entry_of(config: &crate::workspace::Config, record: &Record) -> Option<Entry>
 
 /// 记录的「下一步」：优先取 kind 或记录中的下一步分节，其次取最后一条进展。
 fn next_step_of(record: &Record) -> Option<String> {
-    for name in crate::domain::section::NEXT_STEP {
+    for name in crate::domain::section::NEXT_STEP
+        .iter()
+        .copied()
+        .chain(["Next step", "Next steps"])
+    {
         if let Some(found) = record.body.section(name)
             && !found.body.trim().is_empty()
         {
             return Some(found.body.trim().to_string());
         }
     }
-    record
-        .body
-        .section(crate::domain::section::PROGRESS)
+    [crate::domain::section::PROGRESS, "Progress"]
+        .into_iter()
+        .find_map(|name| record.body.section(name))
         .and_then(|section| section.body.lines().next_back())
         .map(|line| line.trim().to_string())
         .filter(|line| !line.is_empty())
@@ -151,7 +155,7 @@ pub fn render_text(language: &str, overview: &Overview) -> String {
     .iter()
     .map(|(label, count)| fill(labels.line(), &[label, &count.to_string()]))
     .collect();
-    out.push_str(&counts.join("  "));
+    out.push_str(&counts.join("\n"));
     out.push('\n');
 
     for state in State::all() {
@@ -172,10 +176,15 @@ pub fn render_text(language: &str, overview: &Overview) -> String {
         ));
         for entry in matching {
             out.push_str(&format!(
-                "- {} {} · {} · {}\n",
+                "- {} {}\n  {}{}\n",
                 paint(crate::style::accent(), &entry.id),
                 entry.title,
-                entry.kind,
+                fill(labels.heading(), &[labels.kind()]),
+                entry.kind
+            ));
+            out.push_str(&format!(
+                "  {}{}\n",
+                fill(labels.heading(), &[labels.group()]),
                 entry.group
             ));
             if let Some(step) = &entry.next_step {
@@ -253,10 +262,15 @@ pub fn render_handoff(language: &str, overview: &Overview) -> String {
         }
         for entry in matching {
             out.push_str(&format!(
-                "- {} {} · {} · {}\n",
+                "- {} {}\n  {}{}\n",
                 paint(crate::style::accent(), &entry.id),
                 entry.title,
-                entry.kind,
+                fill(labels.heading(), &[labels.kind()]),
+                entry.kind
+            ));
+            out.push_str(&format!(
+                "  {}{}\n",
+                fill(labels.heading(), &[labels.group()]),
                 entry.group
             ));
             out.push_str(&fill(

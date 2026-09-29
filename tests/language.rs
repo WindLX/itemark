@@ -1,4 +1,4 @@
-//! 项目语言：面向使用者的文案只从 output 层的语言 seam 出现
+//! 项目语言：面向使用者的文案来自项目配置；系统语言只用于 init 与无项目场景。
 //!
 //! 测试 seam：真实 CLI 进程 + 临时项目目录。
 
@@ -6,78 +6,177 @@ mod common;
 
 use common::*;
 
-/// 文本里是否还有汉字：英文输出的固定文案不该出现中文句子（记录内容中的中文是数据）。
 fn has_han(text: &str) -> bool {
     text.chars().any(|c| ('\u{4e00}'..='\u{9fff}').contains(&c))
 }
 
-#[test]
-fn init_output_follows_the_project_language() {
-    let zh = Project::new();
-    let zh_output = zh.ok(&["init"]);
-    assert!(zh_output.contains("已创建"), "{zh_output}");
-    assert!(
-        zh_output.contains("下一步：在 worklog.toml 中声明 kind 与 group"),
-        "{zh_output}"
-    );
-
-    let en = Project::new();
-    let en_output = en.ok(&["--language", "en", "init"]);
-    assert!(en_output.contains("created"), "{en_output}");
-    assert!(
-        en_output.contains("Next: declare kinds and groups in worklog.toml"),
-        "{en_output}"
-    );
-    assert!(
-        !has_han(&en_output),
-        "英文输出里没有中文固定文案：{en_output}"
-    );
+fn set_language(project: &Project, language: &str) {
+    project.write("itemark.toml", &CONFIG.replace("zh-CN", language));
 }
 
 #[test]
-fn check_output_follows_the_project_language() {
+fn project_configuration_controls_help_and_record_text() {
     let project = Project::new();
     project.configure();
-    let id = project.add_work("跨语言检查", "todo");
-    project.ok(&["update", &id, "--section", "目标=目标里有一句说明"]);
+    set_language(&project, "en");
 
-    let en = project.ok(&["--language", "en", "check"]);
-    assert!(en.contains("records checked"), "{en}");
-    assert!(en.contains("check passed"), "{en}");
-    assert!(!has_han(&en), "{en}");
+    let help = project.ok(&["--help"]);
+    assert!(help.contains("Usage:"), "{help}");
+    assert!(help.contains("Print help"), "{help}");
+    assert!(!has_han(&help), "{help}");
 
-    let en_kinds = project.ok(&["--language", "en", "kind", "check"]);
-    assert!(en_kinds.contains("kinds checked"), "{en_kinds}");
-    assert!(!has_han(&en_kinds), "{en_kinds}");
+    let id = project.add_work("cross-language", "todo");
+    let record = project.ok(&["show", &id]);
+    assert!(record.contains("title: cross-language"), "{record}");
+    assert!(!record.contains('：'), "{record}");
 }
 
 #[test]
-fn record_text_uses_the_language_separator() {
+fn language_override_option_is_removed() {
     let project = Project::new();
-    project.configure();
-    let id = project.add_work("跨语言记录", "todo");
-
-    let zh = project.ok(&["show", &id]);
-    assert!(zh.contains("标题：跨语言记录"), "{zh}");
-
-    let en = project.ok(&["--language", "en", "show", &id]);
-    assert!(en.contains("title: 跨语言记录"), "{en}");
-    assert!(!en.contains('：'), "英文输出用半角冒号：{en}");
+    let (code, output) = project.fail(&["--language", "en", "init"]);
+    assert_eq!(code, 2);
+    assert!(output.contains("不接受参数"), "{output}");
 }
 
 #[test]
-fn kind_field_rows_follow_the_language() {
+fn init_selects_a_supported_system_language_and_persists_it() {
+    let project = Project::new();
+    let output = project.ok(&["init"]);
+    let config = project.read("itemark.toml");
+    let selected = if config.contains("language = \"en\"") {
+        assert!(output.contains("created"), "{output}");
+        "en"
+    } else {
+        assert!(config.contains("language = \"zh-CN\""), "{config}");
+        assert!(output.contains("已创建"), "{output}");
+        "zh-CN"
+    };
+    assert!(!selected.is_empty());
+}
+
+#[test]
+fn init_language_overrides_existing_environment_and_writes_the_choice() {
+    #[cfg(unix)]
+    {
+        let project = Project::new();
+        let output = project
+            .command()
+            .env("LANG", "en_US.UTF-8")
+            .env_remove("LANGUAGE")
+            .env_remove("LC_ALL")
+            .env_remove("LC_MESSAGES")
+            .arg("init")
+            .output()
+            .expect("run init with English system locale");
+        assert!(
+            output.status.success(),
+            "{}",
+            String::from_utf8_lossy(&output.stderr)
+        );
+        assert!(String::from_utf8_lossy(&output.stdout).contains("created"));
+        assert!(project.read("itemark.toml").contains("language = \"en\""));
+    }
+}
+
+#[test]
+fn configured_language_wins_over_environment_and_json_keys_stay_stable() {
     let project = Project::new();
     project.configure();
-
-    let zh = project.ok(&["kind", "show", "work"]);
-    assert!(zh.contains("- title：string（必填）"), "{zh}");
+    set_language(&project, "en");
+    let add = project
+        .command()
+        .env("LANG", "zh_CN.UTF-8")
+        .args([
+            "add",
+            "--kind",
+            "work",
+            "--group",
+            "产品",
+            "--set",
+            "title=stable",
+            "--set",
+            "status=todo",
+            "--json",
+        ])
+        .output()
+        .expect("run add");
     assert!(
-        zh.contains("- status：enum [todo|in_progress|blocked|done]（必填）"),
-        "{zh}"
+        add.status.success(),
+        "{}",
+        String::from_utf8_lossy(&add.stderr)
+    );
+    let value: serde_json::Value = serde_json::from_slice(&add.stdout).expect("valid JSON");
+    assert_eq!(value["kind"], "work");
+    assert_eq!(value["title"], "stable");
+    assert!(value["id"].as_str().is_some_and(|id| id.starts_with("IM-")));
+    assert!(!String::from_utf8_lossy(&add.stdout).contains('\u{1b}'));
+}
+
+#[test]
+fn no_config_uses_system_language_without_crashing() {
+    #[cfg(unix)]
+    {
+        let project = Project::new();
+        let output = project
+            .command()
+            .env("LANG", "en_US.UTF-8")
+            .env_remove("LANGUAGE")
+            .env_remove("LC_ALL")
+            .env_remove("LC_MESSAGES")
+            .arg("--help")
+            .output()
+            .expect("run help");
+        assert!(output.status.success());
+        let help = String::from_utf8_lossy(&output.stdout);
+        assert!(help.contains("Usage:"), "{help}");
+        assert!(help.contains("Print help"), "{help}");
+
+        let error = project
+            .command()
+            .env("LANG", "zh_CN.UTF-8")
+            .env_remove("LANGUAGE")
+            .env_remove("LC_ALL")
+            .env_remove("LC_MESSAGES")
+            .args(["show", "WL-9999"])
+            .output()
+            .expect("run without config");
+        assert!(!error.status.success());
+        let error_text = String::from_utf8_lossy(&error.stderr);
+        assert!(
+            error_text.contains("当前目录及其父目录中没有"),
+            "{error_text}"
+        );
+    }
+}
+
+#[test]
+fn usage_and_record_errors_use_the_project_language() {
+    let project = Project::new();
+    project.configure();
+    let (_, missing_item) = project.fail(&["show", "WL-9999"]);
+    assert!(missing_item.contains("未知事项"), "{missing_item}");
+    assert!(
+        !missing_item.contains("unknown Itemark item"),
+        "{missing_item}"
     );
 
-    let en = project.ok(&["--language", "en", "kind", "show", "work"]);
-    assert!(en.contains("- title: string (required)"), "{en}");
-    assert!(!en.contains('：'), "{en}");
+    let (_, bad_color) = project.fail(&["--color", "purple", "init"]);
+    assert!(bad_color.contains("颜色仅支持"), "{bad_color}");
+    assert!(!bad_color.contains("expected one of"), "{bad_color}");
+}
+
+#[test]
+fn check_report_details_are_localized_without_changing_check_behavior() {
+    let project = Project::new();
+    project.configure();
+    let output = project.ok(&["add", "--kind", "work", "--group", "产品", "--json"]);
+    let value: serde_json::Value = serde_json::from_str(&output).expect("valid JSON");
+    let id = value["id"].as_str().expect("record ID");
+    let (code, report) = project.fail(&["check", id]);
+    assert_eq!(code, 1);
+    assert!(report.contains("必填字段"), "{report}");
+    assert!(report.contains("必填分节"), "{report}");
+    assert!(!report.contains("required field"), "{report}");
+    assert!(!report.contains("required section"), "{report}");
 }

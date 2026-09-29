@@ -52,6 +52,10 @@ impl ItemIndex {
     }
 
     /// 就地替换或插入一条记录，避免一次写操作重扫整个项目。
+    pub fn remove_path(&mut self, path: &Path) {
+        self.records.retain(|record| record.path != path);
+    }
+
     pub fn upsert(&mut self, record: Record) {
         let path = record.path.clone();
         match self
@@ -68,7 +72,7 @@ impl ItemIndex {
 
     pub fn require(&self, id: &str) -> Result<&Record> {
         self.find(id)
-            .ok_or_else(|| WorkspaceError::usage(format!("unknown worklog item `{id}`")))
+            .ok_or_else(|| WorkspaceError::usage(format!("unknown Itemark item `{id}`")))
     }
 
     /// 分配一个项目范围内未使用的最小 ID。
@@ -160,4 +164,19 @@ fn collect_markdown(dir: &Path, out: &mut Vec<PathBuf>) -> Result<()> {
         }
     }
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn legacy_ids_remain_addressable_and_advance_the_new_sequence() {
+        let temp = tempfile::tempdir().expect("temporary items directory");
+        let path = temp.path().join("legacy.md");
+        std::fs::write(&path, "---\nid: WL-0007\n---\n").expect("write legacy record");
+        let index = ItemIndex::scan(temp.path()).expect("scan records");
+        assert!(index.find("WL-0007").is_some());
+        assert_eq!(index.next_id().expect("next Itemark ID"), "IM-8");
+    }
 }

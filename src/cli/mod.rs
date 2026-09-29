@@ -22,7 +22,6 @@ use args::{Cli, Command, GroupCommand, KindCommand, ListArgs, SearchArgs, ShowAr
 pub struct Context {
     pub project: Option<PathBuf>,
     pub root: Option<PathBuf>,
-    pub language: Option<String>,
     pub mode: OutputMode,
 }
 
@@ -47,7 +46,6 @@ pub fn run(cli: Cli) -> Result<()> {
     let context = Context {
         project: cli.global.project.clone(),
         root: cli.global.root.clone(),
-        language: cli.global.language.clone(),
         mode: OutputMode::from_json(cli.global.json),
     };
     // 着色只在人读文本下有意义；JSON 必须保持机器可读。
@@ -89,14 +87,14 @@ fn dispatch(context: &Context, command: Command) -> Result<()> {
 
 fn show(context: &Context, args: &ShowArgs) -> Result<()> {
     let workspace = context.workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let record = workspace.index().require(&args.id)?;
     item::print_record(context.mode, &language, workspace.config(), record)
 }
 
 fn list(context: &Context, args: &ListArgs) -> Result<()> {
     let workspace = context.workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let mut records: Vec<&crate::record::Record> = workspace.index().records().iter().collect();
     if !args.all {
         records.retain(|record| !record.lifecycle().is_dropped());
@@ -126,7 +124,7 @@ fn list(context: &Context, args: &ListArgs) -> Result<()> {
 
 fn search(context: &Context, args: &SearchArgs) -> Result<()> {
     let workspace = context.workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let mut records = workspace.index().search(&args.query);
     if !args.all {
         records.retain(|record| !record.lifecycle().is_dropped());
@@ -136,7 +134,7 @@ fn search(context: &Context, args: &SearchArgs) -> Result<()> {
 
 fn check(context: &Context, args: &args::CheckArgs) -> Result<()> {
     let workspace = context.workspace()?;
-    let language = workspace.project_language(context.language.as_deref());
+    let language = workspace.project_language();
     let report = match args.id.as_deref() {
         Some(id) => {
             let record = workspace.index().require(id)?;

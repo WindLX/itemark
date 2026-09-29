@@ -1,6 +1,6 @@
-//! 项目配置：读取 `worklog.toml`，解析 Worklog root、语言、group 与 kind 定义。
+//! 项目配置：读取 `itemark.toml`，解析 Itemark root、语言、group 与 kind 定义。
 //!
-//! 取值顺序为显式 CLI 参数 → 项目 `worklog.toml` → 内置默认值。项目配置只记录
+//! 取值顺序为显式 CLI 参数 → 项目 `itemark.toml` → 内置默认值。项目配置只记录
 //! 事项目录、少量查询默认值和显式语言，不承载工作流规则。
 
 use std::collections::BTreeSet;
@@ -10,9 +10,9 @@ use serde::Deserialize;
 
 use crate::error::{WorkspaceError, read_error};
 
-pub const CONFIG_FILE: &str = "worklog.toml";
+pub const CONFIG_FILE: &str = "itemark.toml";
 pub const DEFAULT_LANGUAGE: &str = "zh-CN";
-pub const DEFAULT_ROOT: &str = "worklog";
+pub const DEFAULT_ROOT: &str = "itemark";
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]
@@ -101,7 +101,7 @@ impl ConfigFile {
 /// 已解析并做过路径处理的项目配置。
 #[derive(Debug, Clone)]
 pub struct Config {
-    /// `worklog.toml` 所在目录，root 与模板相对它解析。
+    /// `itemark.toml` 所在目录，root 与模板相对它解析。
     pub project_dir: PathBuf,
     /// 配置文件路径；`init` 之外的项目通常必须存在。
     pub config_path: PathBuf,
@@ -109,7 +109,7 @@ pub struct Config {
     pub root: PathBuf,
     pub kinds: Vec<KindConfig>,
     pub groups: Vec<String>,
-    /// `worklog.toml` 原文；`init` 之外的写入只在需要追加配置时回写它。
+    /// `itemark.toml` 原文；`init` 之外的写入只在需要追加配置时回写它。
     pub raw_text: String,
 }
 
@@ -196,18 +196,12 @@ impl Config {
         self.root.join("summaries")
     }
 
-    /// kind 模板路径：相对 Worklog root 解析，与进程当前目录无关。
+    /// kind 模板路径：相对 Itemark root 解析，与进程当前目录无关。
     #[must_use]
     pub fn template_path(&self, kind: &KindConfig) -> Option<PathBuf> {
         kind.template
             .as_ref()
             .map(|template| absolute_from(&self.root, Path::new(template)))
-    }
-
-    /// 取项目语言，CLI 显式 `--language` 覆盖它。
-    #[must_use]
-    pub fn effective_language(&self, cli: Option<&str>) -> String {
-        cli.map_or_else(|| self.language.clone(), std::string::ToString::to_string)
     }
 }
 
@@ -322,7 +316,7 @@ mod tests {
     use super::*;
 
     fn parse(text: &str) -> Result<ConfigFile, WorkspaceError> {
-        ConfigFile::parse(text, Path::new("worklog.toml"))
+        ConfigFile::parse(text, Path::new("itemark.toml"))
     }
 
     #[test]

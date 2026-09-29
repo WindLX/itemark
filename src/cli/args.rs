@@ -9,9 +9,9 @@ use clap::{Args, Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[command(
-    name = "worklog",
+    name = "itemark",
     version,
-    about = "本地 Worklog：以稳定 ID 管理工作事项、事实与术语"
+    about = "本地 Itemark：以稳定 ID 管理工作事项、事实与术语"
 )]
 pub struct Cli {
     #[command(flatten)]
@@ -21,20 +21,16 @@ pub struct Cli {
     pub command: Command,
 }
 
-/// 所有子命令共享的取值来源：CLI 参数 → `worklog.toml` → 内置默认值。
+/// 所有子命令共享的取值来源：CLI 参数 → `itemark.toml` → 内置默认值。
 #[derive(Debug, Args)]
 pub struct GlobalArgs {
-    /// 项目目录；默认从当前目录向上查找 `worklog.toml`
+    /// 项目目录；默认从当前目录向上查找 `itemark.toml`
     #[arg(long, global = true, help_heading = "全局选项", value_name = "目录")]
     pub project: Option<PathBuf>,
 
-    /// 直接指定 Worklog root，覆盖项目配置
+    /// 直接指定 Itemark root，覆盖项目配置
     #[arg(long, global = true, help_heading = "全局选项", value_name = "目录")]
     pub root: Option<PathBuf>,
-
-    /// 显式指定项目语言，覆盖项目配置
-    #[arg(long, global = true, help_heading = "全局选项", value_name = "BCP47")]
-    pub language: Option<String>,
 
     /// 人读输出的着色策略：auto（默认）仅在终端且未设置 NO_COLOR 时着色
     #[arg(
@@ -61,7 +57,7 @@ fn parse_color(value: &str) -> Result<crate::style::Choice, String> {
 pub enum Command {
     /// 初始化项目配置与推荐目录
     Init(InitArgs),
-    /// 按指定 kind 添加记录；稳定 ID 由 Worklog 分配
+    /// 按指定 kind 添加记录；稳定 ID 由 Itemark 分配
     Add(AddArgs),
     /// 按稳定 ID 查看一条记录
     Show(ShowArgs),
@@ -89,7 +85,7 @@ pub enum Command {
 
 #[derive(Debug, Args)]
 pub struct InitArgs {
-    /// 重写已存在的 `worklog.toml`，不删除任何记录
+    /// 重写已存在的 `itemark.toml`，不删除任何记录
     #[arg(long)]
     pub force: bool,
 }
@@ -315,62 +311,93 @@ fn parse_assignment(text: &str) -> Result<(String, String), String> {
     Ok((key.trim().to_string(), value.to_string()))
 }
 
-/// 帮助模板：与 clap 默认模板一致，只把硬编码的 `Usage:` 换成「用法：」。
-const HELP_TEMPLATE: &str = "\
-{before-help}{about-with-newline}
-用法：{usage}
-
-{all-args}{after-help}";
-
-/// 构建帮助文案已本地化的命令树。
-///
-/// 命令名、选项名与取值保持稳定，不随语言变化；帮助文案固定在编译期，也不随
-/// `--language` 切换。clap 自带的 `Usage:`、`Options:`、`Arguments:`、`Commands:` 都是
-/// 硬编码英文，这里换成中文标题：段落标题由每个参数自己的 `help_heading` 决定，
-/// `build()` 之后补上的内置参数也在改写范围内。
-///
-/// 这些内置参数由 clap 在构建命令树时补上，所以先 `build()` 再改写；`build()` 会递归
-/// 构建并复制整棵命令树（clap 的慢路径），只在启动时跑一次。
+/// 根据项目语言构建帮助命令树；命令名、选项名与参数值始终保持稳定。
 #[must_use]
-pub fn localized_command() -> clap::Command {
+pub fn localized_command(language: &str) -> clap::Command {
+    let english = crate::i18n::is_english(language);
     let mut command = <Cli as clap::CommandFactory>::command();
     command.build();
-    localize(command)
+    localize(command, english, "")
 }
 
-fn localize(command: clap::Command) -> clap::Command {
+fn localize(command: clap::Command, english: bool, parent: &str) -> clap::Command {
+    let locale = if english { "en" } else { "zh-CN" };
+    let current = command.get_name().to_string();
+    let section_commands = if english { "Commands" } else { "命令" };
+    let section_options = if english { "Options" } else { "选项" };
+    let section_args = if english { "Arguments" } else { "参数" };
+    let section_global = if english {
+        "Global options"
+    } else {
+        "全局选项"
+    };
+    let template = if english {
+        "{before-help}{about-with-newline}Usage: {usage}\n\n{all-args}{after-help}"
+    } else {
+        "{before-help}{about-with-newline}用法：{usage}\n\n{all-args}{after-help}"
+    };
     let mut command = command
-        .subcommand_help_heading("命令")
-        .help_template(HELP_TEMPLATE)
+        .help_template(template)
+        .subcommand_help_heading(section_commands)
         .mut_args(|arg| {
-            if arg.get_help_heading().is_some() {
-                arg
-            } else if arg.get_id().as_str() == "help" || arg.get_id().as_str() == "version" {
-                arg.help_heading("全局选项")
+            let id = arg.get_id().as_str().to_string();
+            let heading = if id == "help" || id == "version" {
+                section_global
             } else if arg.is_positional() {
-                arg.help_heading("参数")
+                section_args
             } else {
-                arg.help_heading("选项")
+                section_options
+            };
+            let mut arg = arg.help_heading(heading);
+            if let Some(help) = crate::i18n::argument_help(&id, locale) {
+                arg = arg.help(help).long_help(help);
             }
+            let value_name = if english {
+                match id.as_str() {
+                    "project" | "root" => Some("DIR"),
+                    "body" | "save" => Some("FILE"),
+                    "kind" | "group" | "name" => Some("NAME"),
+                    "title" | "text" | "reason" | "query" => Some("TEXT"),
+                    "unset" => Some("FIELD"),
+                    "id" => Some("ID"),
+                    "set" | "section" | "append" => Some("NAME=VALUE"),
+                    "date" => Some("YYYY-MM-DD"),
+                    "status" => Some("STATUS"),
+                    "at" => Some("TIMESTAMP"),
+                    _ => None,
+                }
+            } else {
+                None
+            };
+            if let Some(value_name) = value_name {
+                arg = arg.value_name(value_name);
+            }
+            arg
         });
+    let about_key = if parent == "group" || parent == "kind" {
+        format!("{}_{}", parent, command.get_name())
+    } else {
+        format!("cmd_{}", command.get_name())
+    };
+    if let Some(about) = crate::i18n::optional_text(&about_key, locale) {
+        command = command.about(about);
+    }
+    if command.get_name() == "itemark" {
+        command = command.about(crate::i18n::text("app_about", locale));
+    }
     if command
         .get_arguments()
         .any(|arg| arg.get_id().as_str() == "help")
     {
-        // 一并改写 `long_help`：任一参数带上长帮助后，clap 会给 `--help` 重新显示英文说明。
-        command = command.mut_arg("help", |arg| arg.help("打印帮助").long_help("打印帮助"));
+        let help = crate::i18n::text("help", locale);
+        command = command.mut_arg("help", |arg| arg.help(help).long_help(help));
     }
     if command
         .get_arguments()
         .any(|arg| arg.get_id().as_str() == "version")
     {
-        command = command.mut_arg("version", |arg| arg.help("打印版本").long_help("打印版本"));
+        let version = crate::i18n::text("version", locale);
+        command = command.mut_arg("version", |arg| arg.help(version).long_help(version));
     }
-    if command
-        .get_subcommands()
-        .any(|sub| sub.get_name() == "help")
-    {
-        command = command.mut_subcommand("help", |sub| sub.about("打印帮助"));
-    }
-    command.mut_subcommands(localize)
+    command.mut_subcommands(|sub| localize(sub, english, &current))
 }

@@ -11,7 +11,7 @@ use common::*;
 /// 一个声明了业务状态字段、但没有声明完成字段与完成值的 kind。
 const PLAIN_CONFIG: &str = r#"
 language = "zh-CN"
-root = "worklog"
+root = "itemark"
 
 [[groups]]
 name = "产品"
@@ -104,8 +104,8 @@ fn show_and_summary_agree_on_the_business_state() {
 #[test]
 fn a_status_field_without_a_completion_rule_does_not_fork() {
     let project = Project::new();
-    project.write("worklog.toml", PLAIN_CONFIG);
-    project.write("worklog/templates/plain.md", PLAIN_TEMPLATE);
+    project.write("itemark.toml", PLAIN_CONFIG);
+    project.write("itemark/templates/plain.md", PLAIN_TEMPLATE);
 
     let id = ids_in(&project.ok(&[
         "add",
