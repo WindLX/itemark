@@ -39,7 +39,7 @@ fn merge_dry_run_does_not_write_or_consume_an_id() {
         fs::read(second_path).expect("reread second source"),
         second_before
     );
-    assert!(!project.path().join("itemark/archive").exists());
+    assert!(!project.path().join("itemark-records/archive").exists());
 
     let next = project.add_work("dry-run 后新建", "todo");
     assert_eq!(next, "IM-3", "dry-run must not reserve an ID");
@@ -86,7 +86,7 @@ fn merge_rejects_conflicting_fields_without_modifying_sources() {
         fs::read(second_path).expect("reread second source"),
         second_before
     );
-    assert!(!project.path().join("itemark/archive").exists());
+    assert!(!project.path().join("itemark-records/archive").exists());
 
     let next = project.add_work("冲突后新建", "todo");
     assert_eq!(next, "IM-3", "a rejected merge must not consume an ID");
@@ -242,7 +242,7 @@ fn record(output: &str) -> serde_json::Value {
 
 fn archived_file(project: &Project, id: &str) -> PathBuf {
     let prefix = format!("{id}-");
-    fs::read_dir(project.path().join("itemark/archive"))
+    fs::read_dir(project.path().join("itemark-records/archive"))
         .expect("archive directory exists")
         .map(|entry| entry.expect("archive entry").path())
         .find(|path| {

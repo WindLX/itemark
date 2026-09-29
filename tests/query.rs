@@ -87,7 +87,7 @@ fn id_order_is_numeric_in_queries_and_summaries() {
     let ids = ["IM-1", "IM-2", "IM-10", "IM-11"];
     for id in ids {
         project.write(
-            &format!("itemark/items/{id}-排序测试.md"),
+            &format!("itemark-records/items/{id}-排序测试.md"),
             &format!(
                 "---\nid: {id}\nkind: work\ngroup: 产品\ntitle: 排序测试 {id}\nstatus: in_progress\n---\n\n## 目标\n\n共同匹配词\n\n## 下一步\n\n共同匹配词\n"
             ),
@@ -270,31 +270,31 @@ fn list_filters_merge_role_reference_health_and_review_state() {
     project.configure();
 
     project.write(
-        "itemark/items/IM-1-有效.md",
+        "itemark-records/items/IM-1-有效.md",
         "---\nid: IM-1\nkind: work\ngroup: 产品\ntitle: 有效\nstatus: todo\n---\n\n## 目标\n\n有效记录\n",
     );
     project.write(
-        "itemark/items/IM-2-已废弃.md",
+        "itemark-records/items/IM-2-已废弃.md",
         "---\nid: IM-2\nkind: work\ngroup: 产品\ntitle: 已废弃\nstatus: todo\ndropped: true\n---\n\n## 目标\n\n废弃目标\n",
     );
     project.write(
-        "itemark/items/IM-3-source.md",
+        "itemark-records/items/IM-3-source.md",
         "---\nid: IM-3\nkind: work\ngroup: 产品\ntitle: 来源角色\nstatus: todo\nmerged_into: IM-99\nparent: IM-99\n---\n\n## 目标\n\n来源记录\n",
     );
     project.write(
-        "itemark/items/IM-4-result.md",
+        "itemark-records/items/IM-4-result.md",
         "---\nid: IM-4\nkind: work\ngroup: 研究\ntitle: 结果角色\nstatus: todo\nmerged_from: [IM-1]\n---\n\n## 目标\n\n结果记录\n",
     );
     project.write(
-        "itemark/items/IM-5-both.md",
+        "itemark-records/items/IM-5-both.md",
         "---\nid: IM-5\nkind: work\ngroup: 产品\ntitle: 双重角色待复核\nstatus: todo\nmerged_into: IM-99\nmerged_from: [IM-1]\nparent: IM-99\nneeds_review: true\n---\n\n## 目标\n\n双重角色记录\n",
     );
     project.write(
-        "itemark/items/IM-6-warning.md",
+        "itemark-records/items/IM-6-warning.md",
         "---\nid: IM-6\nkind: work\ngroup: 产品\ntitle: 引用警告\nstatus: todo\nparent: IM-2\n---\n\n## 目标\n\n引用已废弃记录\n",
     );
     project.write(
-        "itemark/items/IM-7-reviewed-marker.md",
+        "itemark-records/items/IM-7-reviewed-marker.md",
         "---\nid: IM-7\nkind: work\ngroup: 研究\ntitle: 单独复核标记\nstatus: todo\nneeds_review: true\nparent: IM-1\n---\n\n## 目标\n\n复核标记本身不是引用问题\n",
     );
 

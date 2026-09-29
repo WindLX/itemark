@@ -4,7 +4,7 @@
 
 表中“新文件名”是迁移时的路径快照，标题后续变更可能使文件重命名；它不是当前路径目录。稳定 ID 映射才是权威，当前路径可通过项目索引按 ID 查找。
 
-配置入口由 `worklog.toml` 改为 `itemark.toml`，记录 root 由 `worklog/` 改为 `itemark/`。共迁移 32 条记录。
+配置入口由 `worklog.toml` 改为 `itemark.toml`，记录 root 由 `worklog/` 改为 `itemark/`（v0.1.1 把默认 root 改名为 `itemark-records/`；本表按上一条约定保留迁移时点路径）。共迁移 32 条记录。
 
 | 旧 ID | 新 ID | 新文件名 |
 |---|---|---|

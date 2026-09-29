@@ -3,10 +3,10 @@
 # archive when --archive is given. Safe to pipe from curl.
 #
 #   curl -fsSL https://raw.githubusercontent.com/WindLX/itemark/main/scripts/install.sh | sh
-#   curl -fsSL https://raw.githubusercontent.com/WindLX/itemark/main/scripts/install.sh | sh -s -- --version 0.1.0
+#   curl -fsSL https://raw.githubusercontent.com/WindLX/itemark/main/scripts/install.sh | sh -s -- --version 0.1.1
 #
 # Offline:
-#   ./install.sh --archive itemark-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
+#   ./install.sh --archive itemark-v0.1.1-x86_64-unknown-linux-gnu.tar.gz
 set -eu
 
 repo=${ITEMARK_REPO:-WindLX/itemark}
@@ -143,7 +143,7 @@ if [ -z "$archive" ]; then
         v*) version=${version#v} ;;
     esac
     printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.]+)?$' ||
-        { echo "invalid version: $version (expected something like 0.1.0)" >&2; exit 2; }
+        { echo "invalid version: $version (expected something like 0.1.1)" >&2; exit 2; }
     case "$(uname -s)/$(uname -m)" in
         Linux/x86_64|Linux/amd64) release_target=x86_64-unknown-linux-gnu ;;
         Linux/aarch64|Linux/arm64) release_target=aarch64-unknown-linux-gnu ;;

@@ -4,17 +4,17 @@
 
 ## 当前状态
 
-Itemark CLI 已实现（`itemark` 二进制，仓库门禁为 `just ci`），本仓库用它自举管理自身事项，配置入口为 `itemark.toml`、数据目录为 `itemark/`。crate 尚未发布到 crates.io；预编译包经 GitHub Release 分发，发布由 tag 触发。下列 Markdown 文档承载需求、领域词汇与设计约定。
+Itemark CLI 已实现（`itemark` 二进制，仓库门禁为 `just ci`），本仓库用它自举管理自身事项，配置入口为 `itemark.toml`、数据目录为 `itemark-records/`。crate 尚未发布到 crates.io；预编译包经 GitHub Release 分发，发布由 tag 触发。下列 Markdown 文档承载需求、领域词汇与设计约定。
 
 从源码运行：安装 Rust 工具链后，在仓库内运行 `cargo build --release`，再执行 `target/release/itemark <命令>`；开发时也可用 `cargo run -q -- <命令>`。也可在源码仓库安装到 Cargo 的用户级二进制目录：`cargo install --locked --path .`，之后用 `cargo uninstall itemark` 卸载。该方式只安装 CLI，不安装 skill，也不触碰项目记录。crate 尚未发布到 crates.io，因此目前不能使用 `cargo install itemark`。
 
 ## 发布流程
 
-正式发布由 tag 触发：推送形如 `v0.1.0` 的 tag 后，[发布 workflow](.github/workflows/release.yml) 构建全部目标并创建 GitHub Release。tag 中的版本必须与 `Cargo.toml` 一致，否则 workflow 直接失败。手动运行同一 workflow（`workflow_dispatch`，输入版本）只做打包验证，不创建 Release。
+正式发布由 tag 触发：推送形如 `v0.1.1` 的 tag 后，[发布 workflow](.github/workflows/release.yml) 构建全部目标并创建 GitHub Release。tag 中的版本必须与 `Cargo.toml` 一致，否则 workflow 直接失败。手动运行同一 workflow（`workflow_dispatch`，输入版本）只做打包验证，不创建 Release。
 
 ```sh
-git tag v0.1.0
-git push origin v0.1.0
+git tag v0.1.1
+git push origin v0.1.1
 ```
 
 ### Release 资产
@@ -38,7 +38,7 @@ curl -fsSL https://raw.githubusercontent.com/WindLX/itemark/main/scripts/install
 
 # 固定版本，并同时安装 skill 到 Codex 个人 skill 目录
 curl -fsSL https://raw.githubusercontent.com/WindLX/itemark/main/scripts/install.sh | \
-  sh -s -- --version 0.1.0 --skill-profile codex
+  sh -s -- --version 0.1.1 --skill-profile codex
 ```
 
 ```powershell
@@ -47,7 +47,7 @@ irm https://raw.githubusercontent.com/WindLX/itemark/main/scripts/install.ps1 | 
 
 # 需要传选项时先落盘再执行
 irm https://raw.githubusercontent.com/WindLX/itemark/main/scripts/install.ps1 -OutFile install.ps1
-.\install.ps1 -Version 0.1.0 -SkillProfile codex
+.\install.ps1 -Version 0.1.1 -SkillProfile codex
 ```
 
 卸载同样可以远程执行：
@@ -64,17 +64,17 @@ irm https://raw.githubusercontent.com/WindLX/itemark/main/scripts/uninstall.ps1 
 
 ```sh
 # 默认安装到 ~/.local/bin/itemark
-./scripts/install.sh --archive /path/to/itemark-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
+./scripts/install.sh --archive /path/to/itemark-v0.1.1-x86_64-unknown-linux-gnu.tar.gz
 
 # 同时安装 skill 包
-./scripts/install.sh --archive /path/to/itemark-v0.1.0-x86_64-unknown-linux-gnu.tar.gz \
-  --skill-archive /path/to/itemark-skill-v0.1.0.zip --skill-profile codex
+./scripts/install.sh --archive /path/to/itemark-v0.1.1-x86_64-unknown-linux-gnu.tar.gz \
+  --skill-archive /path/to/itemark-skill-v0.1.1.zip --skill-profile codex
 ```
 
 Windows 使用 `scripts/install.ps1 -Archive <ZIP路径>`。这条路径同样会校验归档内容；离线安装不校验 `SHA256SUMS`，请先自行核对官方发布页给出的校验和：
 
 ```sh
-curl -fsSLO https://github.com/WindLX/itemark/releases/download/v0.1.0/SHA256SUMS
+curl -fsSLO https://github.com/WindLX/itemark/releases/download/v0.1.1/SHA256SUMS
 sha256sum -c SHA256SUMS
 ```
 
@@ -99,8 +99,8 @@ skill 包独立于二进制包：Codex profile 默认复制到 `$HOME/.agents/sk
 - [配置与记录示例](docs/examples.md)：项目 TOML、外置 Markdown 模板和 YAML+正文样例。
 - [AI 协作流程](docs/ai-workflow.md)：本项目使用 Itemark CLI 的步骤。
 - [Itemark skill](.agents/skills/itemark/SKILL.md)：Codex 的仓内发现目录与唯一 skill 源文件；Claude Code 入口见 `.claude/skills/itemark/SKILL.md`。
-- [当前自举配置](itemark.toml)：本项目事项入口；活跃记录在 `itemark/items/`，用 `itemark list` / `itemark show <ID>` 读取。
-- [工作记录说明](itemark/README.md)：记录模型、状态与引用约定；v0 接管映射见 [v0 记录适配说明](docs/v0-adaptation.md)。
+- [当前自举配置](itemark.toml)：本项目事项入口；活跃记录在 `itemark-records/items/`，用 `itemark list` / `itemark show <ID>` 读取。
+- [工作记录说明](itemark-records/README.md)：记录模型、状态与引用约定；v0 接管映射见 [v0 记录适配说明](docs/v0-adaptation.md)。
 - [ID/文件名迁移映射](docs/id-migrations/v1-wl-to-im.md)：旧 WL 编号与新 IM 编号、标题文件名的对照。
 
 将 skill 安装到个人配置时，最简单的方式是用安装器的 skill 选项（`--skill-profile` / `-SkillProfile`，见上文预编译安装），也可以手动把 `.agents/skills/itemark/` 整个目录复制到 Codex 的 `~/.agents/skills/` 或 Claude Code 的 `~/.claude/skills/`。仓内 Claude 入口引用 `.agents` 下的源文件；独立安装时请复制完整 skill 目录，不依赖仓库文件。

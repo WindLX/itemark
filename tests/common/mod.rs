@@ -46,7 +46,7 @@ impl Project {
 
     /// Find the current filename by its stable YAML ID, even when the title changes the path.
     pub fn item_file(&self, id: &str) -> PathBuf {
-        for entry in fs::read_dir(self.path().join("itemark/items")).expect("read items") {
+        for entry in fs::read_dir(self.path().join("itemark-records/items")).expect("read items") {
             let path = entry.expect("item entry").path();
             let Ok(record) = itemark::record::Record::read(&path) else {
                 continue;
@@ -62,11 +62,11 @@ impl Project {
     pub fn configure(&self) {
         self.write("itemark.toml", CONFIG);
         self.write(
-            "itemark/templates/project-note.md",
+            "itemark-records/templates/project-note.md",
             "---\nid: \"{{id}}\"\nkind: \"project-note\"\ngroup: \"{{group}}\"\ntitle: \"{{title}}\"\nphase: \"{{phase}}\"\n---\n## 目标\n\n",
         );
         self.write(
-            "itemark/templates/work.md",
+            "itemark-records/templates/work.md",
             "---\nid: \"{{id}}\"\nkind: \"work\"\ngroup: \"{{group}}\"\ntitle: \"{{title}}\"\nstatus: \"{{status}}\"\n---\n## 目标\n\n## 进展\n\n",
         );
     }
@@ -140,7 +140,7 @@ impl Project {
 
 pub const CONFIG: &str = r#"
 language = "zh-CN"
-root = "itemark"
+root = "itemark-records"
 
 [[groups]]
 name = "研究"

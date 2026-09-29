@@ -9,7 +9,7 @@ on:
   workflow_dispatch:
     inputs:
       version:
-        description: 仅打包（不创建 Release）的版本号，必须与 Cargo.toml 一致，例如 0.1.0
+        description: 仅打包（不创建 Release）的版本号，必须与 Cargo.toml 一致，例如 0.1.1
         required: true
         type: string
 
@@ -145,9 +145,9 @@ jobs:
           prefix="$temp_root/prefix"
           skills="$temp_root/skills"
           project="$temp_root/project"
-          mkdir -p "$prefix" "$project/itemark/items"
+          mkdir -p "$prefix" "$project/itemark-records/items"
           printf 'keep this unrelated file\n' > "$prefix/user-file.txt"
-          printf 'keep project records\n' > "$project/itemark/items/keep.md"
+          printf 'keep project records\n' > "$project/itemark-records/items/keep.md"
           archive="itemark-v${VERSION}-${TARGET}.tar.gz"
           skill_archive="skill-bundle/itemark-skill-v${VERSION}.zip"
           scripts/install.sh --archive "$archive" --prefix "$prefix" \
@@ -162,7 +162,7 @@ jobs:
           test -d "$prefix/bin"
           test ! -e "$skills/itemark"
           test -d "$skills"
-          test -f "$project/itemark/items/keep.md"
+          test -f "$project/itemark-records/items/keep.md"
       - name: Smoke-test Windows archive installer
         if: runner.os == 'Windows'
         shell: pwsh

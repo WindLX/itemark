@@ -4,10 +4,10 @@
 #   irm https://raw.githubusercontent.com/WindLX/itemark/main/scripts/install.ps1 | iex
 #
 # Pin a version or pass options:
-#   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/WindLX/itemark/main/scripts/install.ps1))) -Version 0.1.0
+#   & ([scriptblock]::Create((irm https://raw.githubusercontent.com/WindLX/itemark/main/scripts/install.ps1))) -Version 0.1.1
 #
 # Local archive install (offline):
-#   .\install.ps1 -Archive .\itemark-v0.1.0-x86_64-pc-windows-msvc.zip
+#   .\install.ps1 -Archive .\itemark-v0.1.1-x86_64-pc-windows-msvc.zip
 #
 # Messages stay ASCII-only so the script also runs under Windows PowerShell 5.1.
 [CmdletBinding()]

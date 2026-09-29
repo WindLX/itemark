@@ -7,7 +7,7 @@
 ```toml
 # 新项目运行 itemark init 的简体中文配置示例。
 language = "zh-CN"
-root = "itemark"
+root = "itemark-records"
 
 [[groups]]
 name = "general"
@@ -64,7 +64,7 @@ kind 可选声明所需正文节。`add` 可将字段或节留空；它仍创建
 
 ## 本地 Markdown 模板示例
 
-相对 `itemark.toml` 的路径为 `itemark/templates/work.md`。模板文件只放 Markdown 和待填位置，不放脚本或条件规则；`{{field}}` 表示字段插值。
+相对 `itemark.toml` 的路径为 `itemark-records/templates/work.md`。模板文件只放 Markdown 和待填位置，不放脚本或条件规则；`{{field}}` 表示字段插值。
 
 ```markdown
 ---

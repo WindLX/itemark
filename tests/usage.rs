@@ -133,7 +133,7 @@ fn a_closed_pipe_ends_quietly_instead_of_panicking() {
     // 正文远大于管道缓冲区，保证读取端退出后写入必然失败。
     let body = "x".repeat(256 * 1024);
     project.write(
-        "itemark/items/WL-0001.md",
+        "itemark-records/items/WL-0001.md",
         &format!(
             "---\nid: WL-0001\nkind: project-note\ngroup: 研究\ntitle: 大记录\nphase: doing\n---\n\n## 目标\n\n{body}\n"
         ),

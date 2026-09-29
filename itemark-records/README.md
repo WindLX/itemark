@@ -1,6 +1,6 @@
 # Itemark
 
-This directory is the current self-hosting record root. `itemark.toml` sets `root = "itemark"`, so item files live in `items/`, kind templates in `templates/`, and saved summaries in `summaries/`. The item Markdown files are the authoritative records; the index, overview, and handoff are rebuildable projections of them.
+This directory is the current self-hosting record root. `itemark.toml` sets `root = "itemark-records"`, so item files live in `items/`, kind templates in `templates/`, and saved summaries in `summaries/`. The item Markdown files are the authoritative records; the index, overview, and handoff are rebuildable projections of them.
 
 Read and update records through the CLI, not by hand:
 
@@ -28,3 +28,5 @@ Work-state values are `todo` (待办), `in_progress` (进行中), `blocked` (阻
 ## History
 
 `IM-1` through `IM-8` began as hand-written v0 files under `docs/worklog/`. They were taken over into `items/` on 2026-09-28, and the v0 originals were deleted afterwards. The field-by-field mapping is in [v0-adaptation.md](../docs/v0-adaptation.md); the originals remain readable at commit `4c9e733`.
+
+The root directory was named `itemark/` until v0.1.1, where the default root became `itemark-records/` because `itemark/` collided with the CLI command name and the GitHub repository path; this directory was renamed in the same change. Existing projects keep whatever `root` their `itemark.toml` already pins.

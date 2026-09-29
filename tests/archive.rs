@@ -29,7 +29,10 @@ fn archive_keeps_ids_status_references_and_can_be_included_in_queries() {
         .expect("record filename")
         .to_string_lossy()
         .into_owned();
-    let mut archived_path = project.path().join("itemark/archive").join(filename);
+    let mut archived_path = project
+        .path()
+        .join("itemark-records/archive")
+        .join(filename);
 
     let archive_result = project.ok(&["archive", &id, "--json"]);
     let archive_result: serde_json::Value =
@@ -50,7 +53,7 @@ fn archive_keeps_ids_status_references_and_can_be_included_in_queries() {
     let renamed = project.ok(&["update", &id, "--set", "title=归档后改名", "--json"]);
     let renamed: serde_json::Value = serde_json::from_str(&renamed).expect("valid update JSON");
     archived_path = PathBuf::from(renamed["path"].as_str().expect("updated record path"));
-    let archive_root = fs::canonicalize(project.path().join("itemark/archive"))
+    let archive_root = fs::canonicalize(project.path().join("itemark-records/archive"))
         .expect("canonical archive directory");
     let canonical_archived_path = fs::canonicalize(&archived_path).expect("canonical record path");
     assert!(
@@ -60,7 +63,7 @@ fn archive_keeps_ids_status_references_and_can_be_included_in_queries() {
     assert!(!original_archived_path.exists());
     items_path = project
         .path()
-        .join("itemark/items")
+        .join("itemark-records/items")
         .join(archived_path.file_name().expect("renamed record filename"));
 
     let listed = project.ok(&["list", "--json"]);
@@ -104,7 +107,7 @@ fn archive_batches_preflight_every_id_and_destination_before_moving() {
     let second = project.add_work("第二条", "blocked");
     let first_path = project.item_file(&first);
     let second_path = project.item_file(&second);
-    let archive_dir = project.path().join("itemark/archive");
+    let archive_dir = project.path().join("itemark-records/archive");
     let second_archive_path =
         archive_dir.join(second_path.file_name().expect("second record filename"));
 
@@ -138,7 +141,7 @@ fn archive_batches_preflight_every_id_and_destination_before_moving() {
 
     let first_items_collision = project
         .path()
-        .join("itemark/items")
+        .join("itemark-records/items")
         .join(first_path.file_name().expect("first record filename"));
     fs::create_dir_all(&first_items_collision).expect("create conflicting items destination");
     let (_, error) = project.fail(&["unarchive", &first, &second]);

@@ -55,7 +55,7 @@ fn concurrent_adds_allocate_unique_ids() {
         4,
         "every concurrent add gets its own ID: {ids:?}"
     );
-    let files = fs::read_dir(project.path().join("itemark/items"))
+    let files = fs::read_dir(project.path().join("itemark-records/items"))
         .expect("read items directory")
         .count();
     assert_eq!(files, 4, "no record is lost");

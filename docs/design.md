@@ -20,10 +20,10 @@ Group 可混合 kind、仅一层且不嵌套；每条记录恰属一个 group。
 
 Kind 可选声明完成字段和值（配置名称可作工程草案）。写入配置的完成值时，以及运行 `check` 时，强制检查非空完成说明和证据引用或未验证说明；未声明的 kind 不应用固定完成检查。事实核实不会自动完成工作事项。工作事项完成依据的要求保留；既有记录如何校验仍未定。
 
-每条记录对应一个 Markdown 文件，身份不依赖路径。各 kind 共用 YAML 头部和 Markdown 正文；字段规则由 kind 声明。读取头部使用成熟 YAML 库，不自行实现伪 YAML 解析。CLI 定向更新结构字段或正文章节时保留用户正文，不重排整份文档。以下示例采用 Itemark 当前格式；本仓库自举 root 为 `itemark/`：
+每条记录对应一个 Markdown 文件，身份不依赖路径。各 kind 共用 YAML 头部和 Markdown 正文；字段规则由 kind 声明。读取头部使用成熟 YAML 库，不自行实现伪 YAML 解析。CLI 定向更新结构字段或正文章节时保留用户正文，不重排整份文档。以下示例采用 Itemark 当前格式；本仓库自举 root 为 `itemark-records/`：
 
 ```text
-itemark/items/IM-1-建立工作记录入口.md
+itemark-records/items/IM-1-建立工作记录入口.md
 ```
 
 文件开头使用少量结构字段，正文保留人可直接阅读和编辑的工作内容：

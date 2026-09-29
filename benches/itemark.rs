@@ -27,7 +27,7 @@ const SIZES: [usize; 3] = [50, 200, 800];
 
 const CONFIG: &str = r#"
 language = "zh-CN"
-root = "itemark"
+root = "itemark-records"
 
 [[groups]]
 name = "产品"
@@ -50,7 +50,7 @@ const TEMPLATE: &str = "---\nid: \"{{id}}\"\nkind: \"work\"\ngroup: \"{{group}}\
 fn fixture() -> TempDir {
     let dir = TempDir::new().expect("create benchmark project");
     fs::write(dir.path().join("itemark.toml"), CONFIG).expect("write itemark.toml");
-    let templates = dir.path().join("itemark/templates");
+    let templates = dir.path().join("itemark-records/templates");
     fs::create_dir_all(&templates).expect("create templates directory");
     fs::write(templates.join("work.md"), TEMPLATE).expect("write template");
     dir
@@ -73,7 +73,7 @@ fn record_text(id: &str, title: &str, depends_on: Option<&str>) -> String {
 
 /// 铺 `count` 条记录，每条依赖前一条，让引用校验有真实的引用图可走。
 fn seed(dir: &Path, count: usize) {
-    let items = dir.join("itemark/items");
+    let items = dir.join("itemark-records/items");
     fs::create_dir_all(&items).expect("create items directory");
     for index in 1..=count {
         let id = format!("IM-{index}");

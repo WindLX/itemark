@@ -86,7 +86,7 @@ fn check_requires_only_the_fields_the_kind_declares() {
         "itemark.toml",
         r#"
 language = "zh-CN"
-root = "itemark"
+root = "itemark-records"
 
 [[groups]]
 name = "研究"
@@ -111,19 +111,19 @@ fields = [
 "#,
     );
     project.write(
-        "itemark/templates/note.md",
+        "itemark-records/templates/note.md",
         "---\nid: \"{{id}}\"\nkind: \"note\"\ngroup: \"{{group}}\"\n---\n## 目标\n\n",
     );
     project.write(
-        "itemark/templates/task.md",
+        "itemark-records/templates/task.md",
         "---\nid: \"{{id}}\"\nkind: \"task\"\ngroup: \"{{group}}\"\ntitle: \"{{title}}\"\n---\n## 目标\n\n",
     );
     project.write(
-        "itemark/items/WL-0001.md",
+        "itemark-records/items/WL-0001.md",
         "---\nid: \"WL-0001\"\nkind: \"note\"\ngroup: \"研究\"\n---\n\n## 目标\n\n没有标题也算完整。\n",
     );
     project.write(
-        "itemark/items/WL-0002.md",
+        "itemark-records/items/WL-0002.md",
         "---\nid: \"WL-0002\"\nkind: \"task\"\ngroup: \"研究\"\n---\n\n## 目标\n\n缺了必填标题。\n",
     );
 
@@ -141,7 +141,7 @@ fn kind_check_uses_the_same_report_as_check() {
         "itemark.toml",
         r#"
 language = "zh-CN"
-root = "itemark"
+root = "itemark-records"
 
 [[groups]]
 name = "研究"
@@ -160,7 +160,7 @@ fields = [
 "#,
     );
     project.write(
-        "itemark/templates/work.md",
+        "itemark-records/templates/work.md",
         "---\nid: \"{{id}}\"\nkind: \"work\"\ngroup: \"{{group}}\"\ntitle: \"{{title}}\"\nstatus: \"todo\"\n---\n## 目标\n\n",
     );
 

@@ -13,12 +13,12 @@ fn init_writes_the_project_once_and_force_rewrites_it() {
     project.ok(&["init"]);
     assert!(project.exists("itemark.toml"), "init writes project config");
     assert!(
-        project.exists("itemark/items"),
+        project.exists("itemark-records/items"),
         "init creates the items root"
     );
-    assert!(project.exists("itemark/templates"));
+    assert!(project.exists("itemark-records/templates"));
     for kind in ["work", "fact", "term"] {
-        assert!(project.exists(&format!("itemark/templates/{kind}.md")));
+        assert!(project.exists(&format!("itemark-records/templates/{kind}.md")));
     }
     let initial_config = project.read("itemark.toml");
     let initial_language = if initial_config.contains("language = \"en\"") {
@@ -72,9 +72,12 @@ fn init_writes_into_an_explicit_project_directory() {
 #[test]
 fn init_preserves_existing_gitignore_and_adds_lock_entry_once() {
     let project = Project::new();
-    project.write("itemark/.gitignore", "# keep this rule\nitems/*.tmp");
+    project.write(
+        "itemark-records/.gitignore",
+        "# keep this rule\nitems/*.tmp",
+    );
     project.ok(&["init"]);
-    let first = project.read("itemark/.gitignore");
+    let first = project.read("itemark-records/.gitignore");
     assert!(
         first.starts_with("# keep this rule\nitems/*.tmp\n"),
         "{first}"
@@ -82,7 +85,7 @@ fn init_preserves_existing_gitignore_and_adds_lock_entry_once() {
     assert_eq!(first.matches("/.itemark.lock").count(), 1, "{first}");
 
     project.ok(&["init", "--force"]);
-    let second = project.read("itemark/.gitignore");
+    let second = project.read("itemark-records/.gitignore");
     assert_eq!(second.matches("/.itemark.lock").count(), 1, "{second}");
 }
 
@@ -143,7 +146,7 @@ fn new_project_gets_editable_work_fact_and_term_starters() {
     assert!(config.contains("name = \"general\""), "{config}");
     for kind in ["work", "fact", "term"] {
         assert!(config.contains(&format!("name = \"{kind}\"")), "{config}");
-        assert!(project.exists(&format!("itemark/templates/{kind}.md")));
+        assert!(project.exists(&format!("itemark-records/templates/{kind}.md")));
     }
     assert!(
         config.contains(&format!(
@@ -166,7 +169,7 @@ fn new_project_gets_editable_work_fact_and_term_starters() {
         ("fact", vec![statement, sources]),
         ("term", vec![definition]),
     ] {
-        let template = project.read(&format!("itemark/templates/{kind}.md"));
+        let template = project.read(&format!("itemark-records/templates/{kind}.md"));
         for heading in headings {
             assert!(template.contains(&format!("## {heading}")), "{template}");
         }
@@ -294,7 +297,7 @@ fn init_templates_keep_their_validation_names_after_language_changes() {
         )),
         "{config}"
     );
-    let template = project.read("itemark/templates/work.md");
+    let template = project.read("itemark-records/templates/work.md");
     assert!(template.contains(&format!("## {goal}")), "{template}");
     assert!(template.contains(&format!("## {acceptance}")), "{template}");
 

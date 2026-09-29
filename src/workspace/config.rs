@@ -12,7 +12,7 @@ use crate::error::{WorkspaceError, read_error};
 
 pub const CONFIG_FILE: &str = "itemark.toml";
 pub const DEFAULT_LANGUAGE: &str = "zh-CN";
-pub const DEFAULT_ROOT: &str = "itemark";
+pub const DEFAULT_ROOT: &str = "itemark-records";
 
 #[derive(Debug, Clone, Deserialize)]
 #[serde(deny_unknown_fields)]

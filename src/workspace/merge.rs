@@ -701,7 +701,7 @@ mod tests {
             project_dir: PathBuf::from("."),
             config_path: PathBuf::from("itemark.toml"),
             language: "zh-CN".into(),
-            root: PathBuf::from("itemark"),
+            root: PathBuf::from("itemark-records"),
             kinds: vec![KindConfig {
                 name: "work".into(),
                 description: String::new(),

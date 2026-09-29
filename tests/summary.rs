@@ -14,12 +14,12 @@ fn summary_is_read_only_until_a_snapshot_is_requested() {
 
     project.ok(&["summary"]);
     assert!(
-        !project.exists("itemark/summaries"),
+        !project.exists("itemark-records/summaries"),
         "the overview is not saved unless asked"
     );
 
-    project.ok(&["summary", "--save", "itemark/summaries/handoff.md"]);
-    let snapshot = project.read("itemark/summaries/handoff.md");
+    project.ok(&["summary", "--save", "itemark-records/summaries/handoff.md"]);
+    let snapshot = project.read("itemark-records/summaries/handoff.md");
     assert!(snapshot.contains("generated_at"), "{snapshot}");
     assert!(snapshot.contains(&id), "{snapshot}");
 }

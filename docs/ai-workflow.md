@@ -6,7 +6,7 @@ skill 只描述会改变 AI 操作的 Itemark 流程；kind、group、字段规�
 
 ## 开始工作
 
-1. 从项目路径定位 `itemark.toml` 和 CLI 能力。按配置的 `root` 定位事项目录；推荐 root 相对 `itemark.toml` 所在目录解析，模板路径相对 Itemark root，而不是运行时当前目录。本仓库使用 `itemark.toml` 与 `itemark/` root。
+1. 从项目路径定位 `itemark.toml` 和 CLI 能力。按配置的 `root` 定位事项目录；推荐 root 相对 `itemark.toml` 所在目录解析，模板路径相对 Itemark root，而不是运行时当前目录。省略 `root` 时默认 `itemark-records/`；本仓库使用 `itemark.toml` 与 `itemark-records/` root。
 2. 先查看当前 summary，再查询进行中或与请求相关的事项 ID；按需读取 `show` 详情，不全量加载记录。
 3. 新增事项前用 `search` 或 `list` 查重，再用 `kind show` 和 `group list` 选择配置中存在的 kind/group。机器交互优先使用 `--json`；JSON 键、字段名、状态值和 ID 保持稳定。人读输出默认 `zh-CN`，不翻译已有内容。
 
@@ -18,6 +18,6 @@ skill 只描述会改变 AI 操作的 Itemark 流程；kind、group、字段规�
 
 ## 本项目已自举
 
-本仓库用自己管理自己：`itemark.toml` 指定 root 为 `itemark/`，活跃事项在 `itemark/items/`，模板在 `itemark/templates/`，读取入口见 [工作记录说明](../itemark/README.md)。默认通过 Itemark CLI 读写；不要只手写记录文件来绕开 CLI。历史 v0 字段适配见 [v0 记录适配说明](v0-adaptation.md)，ID/文件名迁移映射见 [迁移记录 v1](id-migrations/v1-wl-to-im.md)。
+本仓库用自己管理自己：`itemark.toml` 指定 root 为 `itemark-records/`，活跃事项在 `itemark-records/items/`，模板在 `itemark-records/templates/`，读取入口见 [工作记录说明](../itemark-records/README.md)。默认通过 Itemark CLI 读写；不要只手写记录文件来绕开 CLI。历史 v0 字段适配见 [v0 记录适配说明](v0-adaptation.md)，ID/文件名迁移映射见 [迁移记录 v1](id-migrations/v1-wl-to-im.md)。
 
 推荐的新项目目录为 `itemark.toml`、`<root>/items/`、`<root>/templates/`、`<root>/summaries/`。这是建议布局，不要求其他项目自动迁移既有手工记录。
