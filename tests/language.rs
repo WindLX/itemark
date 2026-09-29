@@ -45,6 +45,11 @@ fn language_override_option_is_removed() {
 #[test]
 fn missing_status_value_uses_a_complete_localized_diagnostic() {
     let project = Project::new();
+    let command_name = if cfg!(windows) {
+        "itemark.exe"
+    } else {
+        "itemark"
+    };
     project.configure();
     let help = project.ok(&["list", "--help"]);
     assert!(help.contains("todo、in_progress、blocked、done"), "{help}");
@@ -61,21 +66,22 @@ fn missing_status_value_uses_a_complete_localized_diagnostic() {
 
     let help_message = project.ok(&["list", "--status", "--help"]);
     assert!(
-        help_message.contains("用法：itemark list"),
+        help_message.contains(&format!("用法：{command_name} list [OPTIONS]")),
         "{help_message}"
     );
     assert!(help_message.contains("可重复指定"), "{help_message}");
     let help_after_multiple_missing_options =
         project.ok(&["list", "--group", "--status", "--help"]);
     assert!(
-        help_after_multiple_missing_options.contains("用法：itemark list"),
+        help_after_multiple_missing_options
+            .contains(&format!("用法：{command_name} list [OPTIONS]")),
         "{help_after_multiple_missing_options}"
     );
 
     set_language(&project, "en");
     let english_help = project.ok(&["list", "--status", "--help"]);
     assert!(
-        english_help.contains("Usage: itemark list"),
+        english_help.contains(&format!("Usage: {command_name} list [OPTIONS]")),
         "{english_help}"
     );
     assert!(english_help.contains("Repeatable"), "{english_help}");
