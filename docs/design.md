@@ -1,6 +1,6 @@
 # 工作记录格式与接口草案
 
-> 状态：自举 v0 草案。目标是让后续 CLI 能接管当前手工记录；字段、目录和命令名称尚未冻结。
+> 状态：当前设计与早期决策记录。CLI 已实现并用于本仓库自举；详细操作以 [CLI 参考](cli.md) 和安装版本的 `itemark --help` 为准。本文保留的未决配置格式仍是工程草案。
 
 ## 目标与边界
 
@@ -20,17 +20,17 @@ Group 可混合 kind、仅一层且不嵌套；每条记录恰属一个 group。
 
 Kind 可选声明完成字段和值（配置名称可作工程草案）。写入配置的完成值时，以及运行 `check` 时，强制检查非空完成说明和证据引用或未验证说明；未声明的 kind 不应用固定完成检查。事实核实不会自动完成工作事项。工作事项完成依据的要求保留；既有记录如何校验仍未定。
 
-工作事项记录采用一个 Markdown 文件，身份不依赖路径。工作事项文件由 YAML 头部和 Markdown 正文组成，读取头部使用成熟 YAML 库，不自行实现伪 YAML 解析。CLI 定向更新结构字段或正文章节时保留用户正文，不重排整份文档。事实和术语是否采用相同记录形状仍待讨论。以下字段和路径仅作为样例（本仓库的实际 root 为 `worklog/`）：
+每条记录对应一个 Markdown 文件，身份不依赖路径。各 kind 共用 YAML 头部和 Markdown 正文；字段规则由 kind 声明。读取头部使用成熟 YAML 库，不自行实现伪 YAML 解析。CLI 定向更新结构字段或正文章节时保留用户正文，不重排整份文档。以下示例采用 Itemark 当前格式；本仓库自举 root 为 `itemark/`：
 
 ```text
-worklog/items/WL-0001.md
+itemark/items/IM-1-建立工作记录入口.md
 ```
 
 文件开头使用少量结构字段，正文保留人可直接阅读和编辑的工作内容：
 
 ```markdown
 ---
-id: WL-0001
+id: IM-1
 title: 建立工作记录入口
 status: in_progress
 parent: null
@@ -64,15 +64,15 @@ depends_on: []
 
 ## 索引与交接
 
-目前索引、总账和交接摘要由人手工维护，并非已实现的生成器；每次核对或更新都注明时点和来源事项。CLI 每次查询都从事项 Markdown 现场构建查询索引，不使用数据库或持久查询缓存。未来 CLI 可按需生成面向人阅读的总览，以及其他可重建视图；至少显示事项 ID、标题、状态、父项、依赖和来源路径。交接摘要指出正在进行、阻塞、完成但未验证、下一步及相关依据，并链接回事项。交接是状态视图，不是可单独编辑的第二份事项状态。
+索引、总览和交接摘要由 CLI 从 Markdown 记录现场生成，不使用数据库或持久查询缓存；它们是可重建视图，不是第二份可编辑的事项状态。输出注明来源 ID 和生成时点，交接指出正在进行、阻塞、完成但未验证、下一步及相关依据，并链接回事项。
 
 ## CLI 与配置
 
 CLI 命令职责见 `docs/cli.md`，TOML 与 YAML 条目例子见 `docs/examples.md`。CLI 提供 init、add、show、list、search、update、log、drop、restore、group、kind、check 和 summary；summary 默认只输出，保存需显式请求。默认人读文本，可选 JSON；错误返回非零状态。同一操作共用逻辑，仅改变呈现。
 
-项目可使用 `worklog.toml` 记录事项目录、少量查询默认值和显式语言；优先级为 CLI 覆盖、项目配置、内置默认值。项目及内置默认语言为 zh-CN，不推断操作系统 locale。切换输出语言只改变呈现，不改变 kind 字段键或必填章节匹配规则；模板与已有记录按其明确定义检查，不自动重写或翻译。语言键和其他配置字段仍是工程草案；配置不承载工作流规则。
+项目 `itemark.toml` 记录事项目录、少量查询默认值和显式语言；可被 CLI 参数覆盖的值按 CLI、项目配置、内置默认值优先。语言由项目配置控制，无项目配置时使用系统 locale；本仓库默认 zh-CN。切换输出语言只改变呈现，不改变 kind 字段键或必填章节匹配规则；模板与已有记录按其明确定义检查，不自动重写或翻译。语言键和其他配置字段仍是工程草案；配置不承载工作流规则。
 
-路径方案建议在项目配置中指定 Worklog root，按相对 `worklog.toml` 所在目录解析；kind 的 `template` 指向 root 下的本地 Markdown 文件，路径推荐相对 root 而非运行时 CWD。配置键位置与最终解析规则仍是工程草案。推荐新项目采用 `<root>/items/`、`<root>/templates/`、`<root>/summaries/`；现有 v0 文件不自动迁移。
+路径方案建议在项目配置中指定 Itemark root，按相对 `itemark.toml` 所在目录解析；kind 的 `template` 指向 root 下的本地 Markdown 文件，路径推荐相对 root 而非运行时 CWD。配置键位置与最终解析规则仍是工程草案。推荐新项目采用 `<root>/items/`、`<root>/templates/`、`<root>/summaries/`；现有 v0 文件不自动迁移。
 
 依赖方向为 Clap、Serde、TOML 解析；YAML 可考虑 serde-saphyr，Markdown 章节解析可考虑 pulldown-cmark，日志可使用 log/env_logger 并写入 stderr。版本尚未固定。CLI 写锁使用 Rust 标准库文件锁能力，不额外引入锁 crate；实现仍需验证目标工具链。
 
@@ -85,7 +85,7 @@ CLI 命令职责见 `docs/cli.md`，TOML 与 YAML 条目例子见 `docs/examples
 - `check_items(root)`：检查 ID 唯一、配置字段约束、必填章节存在且非空、业务状态合法和关系目标存在；对配置了完成字段和值的 kind 执行固定完成检查。
 - `build_views(root, as_of)`：从事项及其关系生成索引、当前总账和交接摘要，并在输出中注明时点与来源。
 
-函数名称、参数类型及 CLI 子命令均待实施时按 Rust 代码校准。本轮先手工建立记录，未来 CLI 能否接管既有格式仍需验证。
+以上函数名称和签名仅是早期职责草案，不约束当前 Rust 模块或函数名。实际 CLI 操作见 [CLI 参考](../.agents/skills/itemark/references/cli.md)；历史 v0 接管结果见 [适配说明](v0-adaptation.md)。
 
 ## 验证方式
 
@@ -97,7 +97,7 @@ CLI 命令职责见 `docs/cli.md`，TOML 与 YAML 条目例子见 `docs/examples
 
 ## 尚待验证
 
-- 自举 Markdown 字段和正文结构能否由未来 Rust CLI 解析、更新并保持原文可读。
+- 历史 v0 记录的映射与已覆盖/未覆盖的兼容行为见 [适配说明](v0-adaptation.md)。
 - 同目录 CLI 锁的实现与错误提示；锁不覆盖编辑器写入。
 - 从当前事项重建索引、总账和交接视图时，来源与时点是否足以让陌生会话继续工作。
 - 配置文件的精确字段、默认值和与命令行参数的映射。

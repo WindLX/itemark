@@ -1,15 +1,17 @@
 ---
-name: worklog
-description: Use when continuing, querying, recording, or handing off work in a project that uses the Worklog CLI. It guides project configuration discovery and record operations; it is not a general memory or note-taking workflow.
+name: itemark
+description: Use when continuing, querying, recording, or handing off work in a project that uses the Itemark CLI. It guides project configuration discovery and record operations; it is not a general memory or note-taking workflow.
 ---
 
-# Worklog
+# Itemark
 
-Use the project's Worklog records as the source for tracked work, facts, and terms. Follow the project's `AGENTS.md` and kind definitions for local language and record requirements. Do not load every record when a summary and targeted IDs answer the request.
+Use the project's Itemark records as the source for tracked work, facts, and terms. Follow the project's `AGENTS.md` and kind definitions for local language and record requirements. Do not load every record when a summary and targeted IDs answer the request.
+
+Read [`references/cli.md`](references/cli.md) when you need the operation model or examples. For exact options supported by the installed binary, use its current `itemark --help` output.
 
 ## Locate and read
 
-1. Find the project `worklog.toml` and the configured Worklog root. Resolve the root as the project configuration specifies; the recommended layout resolves a relative root from the TOML file, and resolves a kind template from the Worklog root.
+1. Find the project's `itemark.toml` and configured Itemark root. Resolve the root as the project configuration specifies; the recommended layout resolves a relative root from the TOML file, and resolves a kind template from the Itemark root.
 2. Read the current summary, then use list/search to find relevant records. Before adding a record, search by its proposed name, meaning, and existing IDs to avoid duplicates. Before starting an unfinished record, read it and check that its `depends_on` targets are complete; start with records whose dependencies are satisfied, and say which record and section the next action comes from.
 3. Use kind show and group list to select definitions that actually exist in this project. Read a record by stable ID when its details matter. Do not hardcode kind names, group names, field schemas, or business states in this skill.
 4. Check the installed CLI's help before relying on exact arguments or options. Prefer JSON for machine-to-machine calls when the current CLI advertises it; keep human-facing output in the configured project language and preserve machine keys and IDs.
@@ -31,4 +33,4 @@ Use the project's Worklog records as the source for tracked work, facts, and ter
 
 ## If the CLI is unavailable
 
-Say plainly that the CLI is not implemented or not available in this environment; do not simulate CLI output or silently replace a requested CLI operation with direct file edits. The repository that owns this skill may explicitly use its hand-maintained v0 records while bootstrapping, but that exception is local to that repository and is not the format contract for other projects. For other projects, wait for an available CLI or explicit authorization for a documented manual workflow.
+Say plainly that the CLI is not available in this environment; do not simulate CLI output or silently replace a requested CLI operation with direct file edits. Continue only if the user explicitly authorizes a documented manual workflow.

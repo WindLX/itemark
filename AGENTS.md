@@ -1,7 +1,8 @@
 # 项目约定
 
-- 本项目管理工作事项、事实与术语，可由项目自定义 kind；不管理 AI 长期记忆，也不归档完整对话。
-- 先读 [需求与验收](docs/spec.md)；术语以 [CONTEXT.md](CONTEXT.md) 为准，命令设计见 [docs/design.md](docs/design.md)，事项追踪规则见 [issue-tracker 配置](docs/agents/issue-tracker.md)。
+- Itemark 管理工作事项、事实与术语，可由项目自定义 kind；不管理 AI 长期记忆，也不归档完整对话。
+- 先读 [需求与验收](docs/spec.md)；术语以 [CONTEXT.md](CONTEXT.md) 为准，命令约束见 [docs/design.md](docs/design.md) 和 [CLI 参考入口](docs/cli.md)，事项追踪规则见 [issue-tracker 配置](docs/agents/issue-tracker.md)。
+- 本仓库已用 Itemark CLI 自举；AI 操作流程见 [docs/ai-workflow.md](docs/ai-workflow.md)，Codex skill 源文件位于 [.agents/skills/itemark/SKILL.md](.agents/skills/itemark/SKILL.md)。不要恢复手工 v0 记录例外。
 - 每条记录用项目范围内唯一的稳定 ID 标识，ID 不依赖文件路径；单条目 Markdown 是权威记录，索引可重建。
 - 只记录已确认的重要决策；进展、验证结果和可复用证据按事实记录。
 - 仅当 kind 显式声明完成字段和值且写入该完成值时，以及运行 `check` 时，执行固定完成依据检查：非空完成说明，以及证据引用或明确的未验证说明；未声明时不应用此检查。事实核实不自动完成工作事项，术语不要求工作业务状态。
