@@ -1,45 +1,82 @@
-name: Release artifacts (manual)
+name: Release
 
+# 发布由 tag 触发：推送 v<版本> tag 才会创建 GitHub Release。
+# 手动触发只做打包验证，上传限期 workflow artifacts，不创建 Release。
 on:
+  push:
+    tags:
+      - 'v*'
   workflow_dispatch:
     inputs:
       version:
-        description: Version label used in artifact names (for example 0.1.0)
+        description: 仅打包（不创建 Release）的版本号，必须与 Cargo.toml 一致，例如 0.1.0
         required: true
         type: string
-  push:
-    branches:
-      - codex/release-prep
 
 permissions:
   contents: read
 
 jobs:
   version:
-    name: Resolve artifact version
+    name: Resolve release version
     runs-on: ubuntu-24.04
     outputs:
       value: ${{ steps.resolve.outputs.value }}
+      publish: ${{ steps.resolve.outputs.publish }}
     steps:
       - uses: actions/checkout@v4
       - uses: dtolnay/rust-toolchain@stable
-      - name: Match artifact version to Cargo.toml
+      - name: Validate tag against Cargo.toml
         id: resolve
         shell: bash
         env:
           EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
           INPUT_VERSION: ${{ inputs.version }}
         run: |
           cargo metadata --no-deps --format-version 1 > "$RUNNER_TEMP/itemark-metadata.json"
           package_version=$(python3 -c 'import json,sys; data=json.load(open(sys.argv[1])); print(next(p["version"] for p in data["packages"] if p["name"] == "itemark"))' "$RUNNER_TEMP/itemark-metadata.json")
-          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
-            [[ "$INPUT_VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.]+)?$ ]]
-            [[ "$INPUT_VERSION" == "$package_version" ]] || { echo "requested version $INPUT_VERSION does not match Cargo.toml $package_version" >&2; exit 1; }
-            version="$INPUT_VERSION"
-          else
-            version="$package_version"
-          fi
+          case "$EVENT_NAME" in
+            push)
+              [[ "$REF_NAME" =~ ^v([0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.]+)?)$ ]] || { echo "release tag $REF_NAME must look like v<major>.<minor>.<patch>" >&2; exit 1; }
+              version="${BASH_REMATCH[1]}"
+              publish=true
+              ;;
+            workflow_dispatch)
+              version="$INPUT_VERSION"
+              publish=false
+              ;;
+            *)
+              echo "unsupported event: $EVENT_NAME" >&2
+              exit 1
+              ;;
+          esac
+          [[ "$version" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.]+)?$ ]] || { echo "invalid version: $version" >&2; exit 1; }
+          [[ "$version" == "$package_version" ]] || { echo "version $version does not match Cargo.toml $package_version" >&2; exit 1; }
           echo "value=$version" >> "$GITHUB_OUTPUT"
+          echo "publish=$publish" >> "$GITHUB_OUTPUT"
+
+  skill:
+    name: Package portable skill
+    needs: version
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+      - name: Package canonical skill source
+        env:
+          VERSION: ${{ needs.version.outputs.value }}
+        run: |
+          [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.]+)?$ ]]
+          test -f .agents/skills/itemark/SKILL.md
+          mkdir -p stage/itemark
+          cp -R .agents/skills/itemark/. stage/itemark/
+          (cd stage && zip -qr "../itemark-skill-v${VERSION}.zip" itemark)
+      - uses: actions/upload-artifact@v4
+        with:
+          name: itemark-skill
+          path: itemark-skill-v${{ needs.version.outputs.value }}.zip*
+          if-no-files-found: error
+          retention-days: 30
 
   binary:
     name: Build ${{ matrix.target }}
@@ -162,32 +199,99 @@ jobs:
           finally {
             if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
           }
+      - name: Smoke-test Unix remote installer
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.value }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          temp_root=$(mktemp -d "$RUNNER_TEMP/itemark-remote-smoke.XXXXXX")
+          server_pid=
+          cleanup() {
+            [ -z "$server_pid" ] || kill "$server_pid" 2>/dev/null || true
+            rm -rf "$temp_root"
+          }
+          trap cleanup EXIT
+          assets="$temp_root/assets"
+          mkdir -p "$assets"
+          cp "itemark-v${VERSION}-${TARGET}.tar.gz" "skill-bundle/itemark-skill-v${VERSION}.zip" "$assets/"
+          cp scripts/install.sh scripts/uninstall.sh "$assets/"
+          if command -v sha256sum >/dev/null 2>&1; then
+            (cd "$assets" && sha256sum *.tar.gz *.zip > SHA256SUMS)
+          else
+            (cd "$assets" && shasum -a 256 *.tar.gz *.zip > SHA256SUMS)
+          fi
+          port=8731
+          python3 -m http.server "$port" --directory "$assets" >"$temp_root/server.log" 2>&1 &
+          server_pid=$!
+          base="http://127.0.0.1:$port"
+          for _ in $(seq 1 50); do
+            curl -fsS "$base/SHA256SUMS" >/dev/null 2>&1 && break
+            sleep 0.2
+          done
+          curl -fsS "$base/SHA256SUMS" >/dev/null
+          prefix="$temp_root/prefix"
+          skills="$temp_root/skills"
+          curl -fsSL "$base/install.sh" | sh -s -- --version "$VERSION" --base-url "$base" \
+            --prefix "$prefix" --skill-profile codex --skill-home "$skills"
+          [[ $("$prefix/bin/itemark" --version) == "itemark $VERSION" ]]
+          test -f "$skills/itemark/SKILL.md"
+          test -f "$skills/itemark/references/cli.md"
+          curl -fsSL "$base/uninstall.sh" | sh -s -- --prefix "$prefix"
+          test ! -e "$prefix/bin/itemark"
+          test ! -e "$prefix/.itemark-install"
+          test ! -e "$skills/itemark"
+      - name: Smoke-test Windows remote installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.value }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          $ErrorActionPreference = 'Stop'
+          $tempRoot = Join-Path $env:RUNNER_TEMP ('itemark-remote-smoke-' + [Guid]::NewGuid().ToString('N'))
+          $assets = Join-Path $tempRoot 'assets'
+          $server = $null
+          try {
+            New-Item -ItemType Directory -Force -Path $assets | Out-Null
+            Copy-Item "itemark-v${env:VERSION}-${env:TARGET}.zip" $assets
+            Copy-Item (Join-Path 'skill-bundle' "itemark-skill-v${env:VERSION}.zip") $assets
+            Copy-Item 'scripts\install.ps1' $assets
+            Copy-Item 'scripts\uninstall.ps1' $assets
+            $lines = Get-ChildItem -LiteralPath $assets -File -Filter *.zip | ForEach-Object {
+              "$((Get-FileHash -LiteralPath $_.FullName -Algorithm SHA256).Hash.ToLowerInvariant())  $($_.Name)"
+            }
+            Set-Content -LiteralPath (Join-Path $assets 'SHA256SUMS') -Value $lines
+            $port = 8732
+            $server = Start-Process python -ArgumentList '-m', 'http.server', $port, '--directory', $assets -PassThru -WindowStyle Hidden
+            $base = "http://127.0.0.1:$port"
+            $ready = $false
+            foreach ($attempt in 1..50) {
+              try { Invoke-WebRequest -Uri "$base/SHA256SUMS" -UseBasicParsing | Out-Null; $ready = $true; break }
+              catch { Start-Sleep -Milliseconds 200 }
+            }
+            if (-not $ready) { throw 'local asset server did not start' }
+            $prefix = Join-Path $tempRoot 'prefix'
+            $skills = Join-Path $tempRoot 'skills'
+            & (Join-Path $assets 'install.ps1') -Version $env:VERSION -BaseUrl $base -Prefix $prefix -SkillProfile codex -SkillHome $skills
+            $binary = Join-Path $prefix 'itemark.exe'
+            $actualVersion = (& $binary --version | Out-String).Trim()
+            if ($LASTEXITCODE -ne 0 -or $actualVersion -ne "itemark $env:VERSION") { throw "Remote install failed: $actualVersion" }
+            if (-not (Test-Path -LiteralPath (Join-Path $skills 'itemark\SKILL.md') -PathType Leaf)) { throw 'Remote install is missing the skill' }
+            & (Join-Path $assets 'uninstall.ps1') -Prefix $prefix
+            if (Test-Path -LiteralPath $binary) { throw 'Remote uninstall left the installed binary' }
+            if (Test-Path -LiteralPath (Join-Path $prefix '.itemark-install')) { throw 'Remote uninstall left its receipt' }
+            if (Test-Path -LiteralPath (Join-Path $skills 'itemark')) { throw 'Remote uninstall left the managed skill' }
+          }
+          finally {
+            if ($server) { Stop-Process -Id $server.Id -Force -ErrorAction SilentlyContinue }
+            if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: itemark-${{ matrix.target }}
           path: itemark-v${{ needs.version.outputs.value }}-${{ matrix.target }}.*
-          if-no-files-found: error
-          retention-days: 30
-
-  skill:
-    name: Package portable skill
-    needs: version
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v4
-      - name: Package canonical skill source
-        env:
-          VERSION: ${{ needs.version.outputs.value }}
-        run: |
-          [[ "${VERSION}" =~ ^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.]+)?$ ]]
-          test -f .agents/skills/itemark/SKILL.md
-          mkdir -p stage/itemark
-          cp -R .agents/skills/itemark/. stage/itemark/
-          (cd stage && zip -qr "../itemark-skill-v${VERSION}.zip" itemark)
-      - uses: actions/upload-artifact@v4
-        with:
-          name: itemark-skill
-          path: itemark-skill-v${{ needs.version.outputs.value }}.zip*
           if-no-files-found: error
           retention-days: 30
 
@@ -210,3 +314,27 @@ jobs:
           path: bundle/*
           if-no-files-found: error
           retention-days: 30
+
+  release:
+    name: Publish GitHub Release
+    needs: [version, bundle]
+    if: needs.version.outputs.publish == 'true'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: itemark-release-bundle
+          path: release-assets
+      - name: Create GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ needs.version.outputs.value }}
+          REPOSITORY: ${{ github.repository }}
+        run: |
+          gh release create "v${VERSION}" \
+            --repo "$REPOSITORY" \
+            --title "Itemark v${VERSION}" \
+            --generate-notes \
+            release-assets/*
