@@ -5,6 +5,7 @@
 
 pub mod index;
 pub mod markdown;
+pub mod references;
 
 use std::path::{Path, PathBuf};
 

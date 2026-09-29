@@ -190,6 +190,7 @@ pub fn check(context: &Context, args: &KindCheckArgs) -> Result<()> {
     // 发现与记录检查同构：同一份 CheckReport，同一处渲染。
     let mut report = CheckReport {
         issues: Vec::new(),
+        warnings: Vec::new(),
         checked: 0,
     };
     for kind in kinds {

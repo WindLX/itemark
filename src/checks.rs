@@ -20,6 +20,7 @@ pub enum IssueKind {
     UnknownKind,
     UnknownGroup,
     BrokenReference,
+    DeprecatedReference,
     CompletionEvidence,
     /// kind 自身声明的问题（`kind check`），例如完成字段指向未声明的字段。
     KindDeclaration,
@@ -36,6 +37,7 @@ impl IssueKind {
             Self::UnknownKind => "unknown_kind",
             Self::UnknownGroup => "unknown_group",
             Self::BrokenReference => "broken_reference",
+            Self::DeprecatedReference => "deprecated_reference",
             Self::CompletionEvidence => "completion_evidence",
             Self::KindDeclaration => "kind_declaration",
         }
@@ -58,6 +60,7 @@ impl fmt::Display for Issue {
 #[derive(Debug, Clone, Default)]
 pub struct CheckReport {
     pub issues: Vec<Issue>,
+    pub warnings: Vec<Issue>,
     pub checked: usize,
 }
 
@@ -95,6 +98,11 @@ impl CheckReport {
                 "target": issue.target,
                 "detail": issue.detail,
             })).collect::<Vec<_>>(),
+            "warnings": self.warnings.iter().map(|warning| serde_json::json!({
+                "type": warning.kind.as_key(),
+                "target": warning.target,
+                "detail": warning.detail,
+            })).collect::<Vec<_>>(),
         })
     }
 }
@@ -105,6 +113,7 @@ pub fn check_all(workspace: &Workspace) -> CheckReport {
     let records = workspace.index().records();
     let mut report = CheckReport {
         issues: Vec::new(),
+        warnings: Vec::new(),
         checked: records.len(),
     };
 
@@ -151,6 +160,7 @@ pub fn check_all(workspace: &Workspace) -> CheckReport {
             &target,
             &known,
             &mut report.issues,
+            &mut report.warnings,
         );
     }
 
@@ -164,6 +174,7 @@ pub fn check_record(
     target: &str,
     known_ids: &BTreeMap<String, &Record>,
     issues: &mut Vec<Issue>,
+    warnings: &mut Vec<Issue>,
 ) {
     let Ok(kind_name) = record.kind() else {
         return;
@@ -234,13 +245,44 @@ pub fn check_record(
                     target: target.to_string(),
                     detail: format!("`{field}` must not reference the record itself"),
                 });
-            } else if !known_ids.contains_key(&reference) {
-                issues.push(Issue {
-                    kind: IssueKind::BrokenReference,
+            } else {
+                match known_ids.get(&reference) {
+                    None => issues.push(Issue {
+                        kind: IssueKind::BrokenReference,
+                        target: target.to_string(),
+                        detail: relation_reference_message(config, field, &reference, false),
+                    }),
+                    Some(referenced) if referenced.lifecycle().is_dropped() => {
+                        warnings.push(Issue {
+                            kind: IssueKind::DeprecatedReference,
+                            target: target.to_string(),
+                            detail: relation_reference_message(config, field, &reference, true),
+                        });
+                    }
+                    Some(_) => {}
+                }
+            }
+        }
+    }
+
+    let body = crate::record::markdown::split_front_matter(&record.raw)
+        .map(|(_, body)| body)
+        .unwrap_or_default();
+    for reference in crate::record::references::find_inline_references(&body) {
+        match known_ids.get(&reference.id) {
+            None => issues.push(Issue {
+                kind: IssueKind::BrokenReference,
+                target: target.to_string(),
+                detail: inline_reference_message(config, reference.line, &reference.id, false),
+            }),
+            Some(referenced) if referenced.lifecycle().is_dropped() => {
+                warnings.push(Issue {
+                    kind: IssueKind::DeprecatedReference,
                     target: target.to_string(),
-                    detail: format!("`{field}` references unknown record `{reference}`"),
+                    detail: inline_reference_message(config, reference.line, &reference.id, true),
                 });
             }
+            Some(_) => {}
         }
     }
 
@@ -255,6 +297,32 @@ pub fn check_record(
             ),
         });
     }
+}
+
+fn inline_reference_message(config: &Config, line: usize, id: &str, dropped: bool) -> String {
+    let key = if dropped {
+        "reference_body_dropped"
+    } else {
+        "reference_body_missing"
+    };
+    crate::output::fill(
+        crate::i18n::text(key, &config.language),
+        &[&line.to_string(), id],
+    )
+}
+
+fn relation_reference_message(config: &Config, field: &str, id: &str, dropped: bool) -> String {
+    let relation = match field {
+        "parent" => "parent",
+        _ => "dependency",
+    };
+    let key = match (relation, dropped) {
+        ("parent", false) => "reference_parent_missing",
+        ("parent", true) => "reference_parent_dropped",
+        (_, false) => "reference_dependency_missing",
+        (_, true) => "reference_dependency_dropped",
+    };
+    crate::output::fill(crate::i18n::text(key, &config.language), &[id])
 }
 
 // 完成依据的检查由 `crate::status::completion_gaps` 唯一判定；`check` 只把缺口呈现为检查发现。

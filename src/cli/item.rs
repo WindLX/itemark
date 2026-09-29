@@ -537,6 +537,27 @@ pub fn print_report(
                 println!("- {}", paint(style::error(), &message));
             }
         }
+        if !report.warnings.is_empty() {
+            println!(
+                "{}",
+                fill(
+                    labels.line(),
+                    &[
+                        &paint(style::warn(), labels.warnings()),
+                        &paint(style::warn(), &report.warnings.len().to_string()),
+                    ]
+                )
+            );
+            for warning in &report.warnings {
+                println!(
+                    "- {}",
+                    paint(
+                        style::warn(),
+                        &crate::i18n::localize_diagnostic(&warning.to_string(), language)
+                    )
+                );
+            }
+        }
     }
     if report.is_ok() {
         Ok(())

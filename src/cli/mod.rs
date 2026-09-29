@@ -194,9 +194,17 @@ fn check(context: &Context, args: &args::CheckArgs) -> Result<()> {
             let known = workspace.index().by_id();
             let mut report = crate::checks::CheckReport {
                 issues: Vec::new(),
+                warnings: Vec::new(),
                 checked: 1,
             };
-            crate::checks::check_record(workspace.config(), record, id, &known, &mut report.issues);
+            crate::checks::check_record(
+                workspace.config(),
+                record,
+                id,
+                &known,
+                &mut report.issues,
+                &mut report.warnings,
+            );
             report
         }
         None => crate::checks::check_all(&workspace),

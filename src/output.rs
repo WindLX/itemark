@@ -58,7 +58,7 @@ labels! {
     blocked => "blocked"; unverified => "unverified"; todo => "todo"; done => "done";
     no_status => "no_status"; next_step => "next_step"; dropped_items => "dropped_items";
     groups => "groups"; kinds => "kinds"; fields => "fields"; required_sections => "required_sections";
-    template => "template"; description => "description"; issues => "issues"; checked => "checked";
+    template => "template"; description => "description"; issues => "issues"; warnings => "warnings"; checked => "checked";
     checked_kinds => "checked_kinds"; ok => "ok"; saved => "saved"; updated => "updated";
     created => "created"; init_line => "init_line"; next_step_hint => "next_step_hint";
     kind_summary => "kind_summary"; group_summary => "group_summary"; template_line => "template_line";
