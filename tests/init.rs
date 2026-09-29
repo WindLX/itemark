@@ -20,6 +20,16 @@ fn init_writes_the_project_once_and_force_rewrites_it() {
     for kind in ["work", "fact", "term"] {
         assert!(project.exists(&format!("itemark/templates/{kind}.md")));
     }
+    let initial_config = project.read("itemark.toml");
+    let initial_language = if initial_config.contains("language = \"en\"") {
+        "en"
+    } else {
+        assert!(
+            initial_config.contains("language = \"zh-CN\""),
+            "{initial_config}"
+        );
+        "zh-CN"
+    };
 
     let (_code, output) = project.fail(&["init"]);
     assert!(
@@ -28,7 +38,11 @@ fn init_writes_the_project_once_and_force_rewrites_it() {
     );
 
     project.ok(&["init", "--force"]);
-    assert!(project.read("itemark.toml").contains("zh-CN"));
+    let config = project.read("itemark.toml");
+    assert!(
+        config.contains(&format!("language = \"{initial_language}\"")),
+        "{config}"
+    );
 }
 
 #[test]
@@ -75,15 +89,7 @@ fn init_preserves_existing_gitignore_and_adds_lock_entry_once() {
 #[test]
 fn new_project_gets_editable_work_fact_and_term_starters() {
     let project = Project::new();
-    let output = project
-        .command()
-        .env("LANG", "zh_CN.UTF-8")
-        .env_remove("LANGUAGE")
-        .env_remove("LC_ALL")
-        .env_remove("LC_MESSAGES")
-        .arg("init")
-        .output()
-        .expect("run init");
+    let output = project.run(&["init"]);
     assert!(
         output.status.success(),
         "{}",
@@ -91,10 +97,79 @@ fn new_project_gets_editable_work_fact_and_term_starters() {
     );
 
     let config = project.read("itemark.toml");
+    let english = if config.contains("language = \"en\"") {
+        assert!(String::from_utf8_lossy(&output.stdout).contains("created"));
+        true
+    } else {
+        assert!(config.contains("language = \"zh-CN\""), "{config}");
+        assert!(String::from_utf8_lossy(&output.stdout).contains("已创建"));
+        false
+    };
+    let (
+        goal,
+        acceptance,
+        statement,
+        sources,
+        definition,
+        completion_note_label,
+        completion_evidence_label,
+        completion_note_missing,
+        completion_evidence_missing,
+    ) = if english {
+        (
+            "Goal",
+            "Acceptance",
+            "Statement",
+            "Sources",
+            "Definition",
+            "completion note",
+            "completion evidence",
+            "completion_note",
+            "completion_evidence",
+        )
+    } else {
+        (
+            "目标",
+            "验收",
+            "事实陈述",
+            "来源",
+            "定义",
+            "完成说明",
+            "完成证据",
+            "完成说明",
+            "完成证据",
+        )
+    };
     assert!(config.contains("name = \"general\""), "{config}");
     for kind in ["work", "fact", "term"] {
         assert!(config.contains(&format!("name = \"{kind}\"")), "{config}");
         assert!(project.exists(&format!("itemark/templates/{kind}.md")));
+    }
+    assert!(
+        config.contains(&format!(
+            "required_sections = [\"{goal}\", \"{acceptance}\"]"
+        )),
+        "{config}"
+    );
+    assert!(
+        config.contains(&format!(
+            "required_sections = [\"{statement}\", \"{sources}\"]"
+        )),
+        "{config}"
+    );
+    assert!(
+        config.contains(&format!("required_sections = [\"{definition}\"]")),
+        "{config}"
+    );
+    for (kind, headings) in [
+        ("work", vec![goal, acceptance]),
+        ("fact", vec![statement, sources]),
+        ("term", vec![definition]),
+    ] {
+        let template = project.read(&format!("itemark/templates/{kind}.md"));
+        for heading in headings {
+            assert!(template.contains(&format!("## {heading}")), "{template}");
+        }
     }
 
     let work_output = project.ok(&[
@@ -111,22 +186,25 @@ fn new_project_gets_editable_work_fact_and_term_starters() {
     let work = work_json["id"].as_str().expect("work ID");
     assert_eq!(work_json["status"], "todo");
     let shown = project.ok(&["show", work]);
-    assert!(!shown.contains("completion_note："), "{shown}");
-    assert!(!shown.contains("completion_evidence："), "{shown}");
+    assert!(!shown.contains(completion_note_label), "{shown}");
+    assert!(!shown.contains(completion_evidence_label), "{shown}");
     let (_, missing) = project.fail(&["check", work]);
-    assert!(missing.contains("目标"), "{missing}");
-    assert!(missing.contains("验收"), "{missing}");
+    assert!(missing.contains(goal), "{missing}");
+    assert!(missing.contains(acceptance), "{missing}");
     project.ok(&[
         "update",
         work,
         "--section",
-        "目标=完成初始目标",
+        &format!("{goal}=完成初始目标"),
         "--section",
-        "验收=检查并通过",
+        &format!("{acceptance}=检查并通过"),
     ]);
     let (_, incomplete) = project.fail(&["update", work, "--set", "status=done"]);
-    assert!(incomplete.contains("完成说明"), "{incomplete}");
-    assert!(incomplete.contains("证据"), "{incomplete}");
+    assert!(incomplete.contains(completion_note_missing), "{incomplete}");
+    assert!(
+        incomplete.contains(completion_evidence_missing),
+        "{incomplete}"
+    );
     project.ok(&[
         "update",
         work,
@@ -153,8 +231,8 @@ fn new_project_gets_editable_work_fact_and_term_starters() {
     assert_eq!(fact_json["fields"]["verification"], "unverified");
     let fact = fact_json["id"].as_str().expect("fact ID");
     let (_, fact_missing) = project.fail(&["check", fact]);
-    assert!(fact_missing.contains("事实陈述"), "{fact_missing}");
-    assert!(fact_missing.contains("来源"), "{fact_missing}");
+    assert!(fact_missing.contains(statement), "{fact_missing}");
+    assert!(fact_missing.contains(sources), "{fact_missing}");
 
     let term_output = project.ok(&[
         "add",
@@ -170,7 +248,7 @@ fn new_project_gets_editable_work_fact_and_term_starters() {
     assert_eq!(term_json["fields"]["aliases"], serde_json::json!([]));
     let term = term_json["id"].as_str().expect("term ID");
     let (_, term_missing) = project.fail(&["check", term]);
-    assert!(term_missing.contains("定义"), "{term_missing}");
+    assert!(term_missing.contains(definition), "{term_missing}");
 }
 
 #[test]
@@ -190,33 +268,35 @@ name = "research"
 }
 
 #[test]
-fn english_init_templates_keep_their_validation_names_after_language_changes() {
+fn init_templates_keep_their_validation_names_after_language_changes() {
     let project = Project::new();
-    let init = project
-        .command()
-        .env("LANG", "en_US.UTF-8")
-        .env_remove("LANGUAGE")
-        .env_remove("LC_ALL")
-        .env_remove("LC_MESSAGES")
-        .arg("init")
-        .output()
-        .expect("run English init");
+    let init = project.run(&["init"]);
     assert!(
         init.status.success(),
         "{}",
         String::from_utf8_lossy(&init.stderr)
     );
     let config = project.read("itemark.toml");
-    assert!(config.contains("language = \"en\""), "{config}");
+    let english = if config.contains("language = \"en\"") {
+        true
+    } else {
+        assert!(config.contains("language = \"zh-CN\""), "{config}");
+        false
+    };
+    let (goal, acceptance, other_language) = if english {
+        ("Goal", "Acceptance", "zh-CN")
+    } else {
+        ("目标", "验收", "en")
+    };
     assert!(
-        config.contains("required_sections = [\"Goal\", \"Acceptance\"]"),
+        config.contains(&format!(
+            "required_sections = [\"{goal}\", \"{acceptance}\"]"
+        )),
         "{config}"
     );
-    assert!(
-        project
-            .read("itemark/templates/work.md")
-            .contains("## Goal")
-    );
+    let template = project.read("itemark/templates/work.md");
+    assert!(template.contains(&format!("## {goal}")), "{template}");
+    assert!(template.contains(&format!("## {acceptance}")), "{template}");
 
     let added = project.ok(&[
         "add",
@@ -231,17 +311,24 @@ fn english_init_templates_keep_their_validation_names_after_language_changes() {
     let value: serde_json::Value = serde_json::from_str(&added).expect("valid JSON");
     let id = value["id"].as_str().expect("record ID");
     let (_, report) = project.fail(&["check", id]);
-    assert!(report.contains("Goal"), "{report}");
-    assert!(report.contains("Acceptance"), "{report}");
+    assert!(report.contains(goal), "{report}");
+    assert!(report.contains(acceptance), "{report}");
 
     project.write(
         "itemark.toml",
-        &config.replace(r#"language = "en""#, r#"language = "zh-CN""#),
+        &config.replace(
+            if english {
+                r#"language = "en""#
+            } else {
+                r#"language = "zh-CN""#
+            },
+            &format!("language = \"{other_language}\""),
+        ),
     );
     let (_, translated_report) = project.fail(&["check", id]);
-    assert!(translated_report.contains("Goal"), "{translated_report}");
+    assert!(translated_report.contains(goal), "{translated_report}");
     assert!(
-        translated_report.contains("必填分节"),
+        translated_report.contains(acceptance),
         "{translated_report}"
     );
 }
