@@ -13,11 +13,22 @@ pub struct ItemIndex {
 }
 
 impl ItemIndex {
-    /// 扫描 items 目录，按稳定 ID 排序。
+    /// 扫描一个或多个记录目录，按稳定 ID 排序。
     pub fn scan(items_dir: &Path) -> Result<Self> {
+        Self::scan_directories(&[items_dir])
+    }
+
+    /// 扫描活动记录与归档记录，共用一个稳定 ID 索引。
+    pub fn scan_with_archive(items_dir: &Path, archive_dir: &Path) -> Result<Self> {
+        Self::scan_directories(&[items_dir, archive_dir])
+    }
+
+    fn scan_directories(directories: &[&Path]) -> Result<Self> {
         let mut paths = Vec::new();
-        if items_dir.is_dir() {
-            collect_markdown(items_dir, &mut paths)?;
+        for directory in directories {
+            if directory.is_dir() {
+                collect_markdown(directory, &mut paths)?;
+            }
         }
         paths.sort();
         let mut records = Vec::with_capacity(paths.len());

@@ -187,6 +187,11 @@ impl Config {
     }
 
     #[must_use]
+    pub fn archive_dir(&self) -> PathBuf {
+        self.root.join("archive")
+    }
+
+    #[must_use]
     pub fn templates_dir(&self) -> PathBuf {
         self.root.join("templates")
     }

@@ -21,6 +21,7 @@ pub enum IssueKind {
     UnknownGroup,
     BrokenReference,
     DeprecatedReference,
+    NeedsReview,
     CompletionEvidence,
     /// kind 自身声明的问题（`kind check`），例如完成字段指向未声明的字段。
     KindDeclaration,
@@ -38,6 +39,7 @@ impl IssueKind {
             Self::UnknownGroup => "unknown_group",
             Self::BrokenReference => "broken_reference",
             Self::DeprecatedReference => "deprecated_reference",
+            Self::NeedsReview => "needs_review",
             Self::CompletionEvidence => "completion_evidence",
             Self::KindDeclaration => "kind_declaration",
         }
@@ -295,6 +297,17 @@ pub fn check_record(
                 "completion value is recorded but is missing {}",
                 missing.join(" and ")
             ),
+        });
+    }
+
+    if record
+        .get("needs_review")
+        .is_some_and(|value| value.display() == "true")
+    {
+        warnings.push(Issue {
+            kind: IssueKind::NeedsReview,
+            target: target.to_string(),
+            detail: crate::i18n::text("merge_needs_review", &config.language).to_string(),
         });
     }
 }

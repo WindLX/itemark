@@ -16,7 +16,7 @@ pub fn summary(context: &Context, args: &SummaryArgs) -> Result<()> {
     let workspace = context.workspace()?;
     let language = workspace.project_language();
     let generated_at = args.at.clone().unwrap_or_else(crate::time::now_iso);
-    let overview = view::build(&workspace, generated_at);
+    let overview = view::build(&workspace, generated_at, args.include_archived);
 
     if let Some(target) = args.save.as_deref() {
         let target = if target.is_dir() {

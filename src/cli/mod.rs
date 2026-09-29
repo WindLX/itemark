@@ -3,11 +3,13 @@
 //! 读命令直接打开只读项目上下文；写命令在项目锁内完成一次写操作，写入前比对内容以
 //! 发现外部改动。
 
+pub mod archive;
 pub mod args;
 pub mod config_cmd;
 pub mod group;
 pub mod item;
 pub mod kind_cmd;
+pub mod merge;
 pub mod summary;
 
 use std::path::PathBuf;
@@ -70,6 +72,9 @@ fn dispatch(context: &Context, command: Command) -> Result<()> {
         Command::Log(args) => item::log(context, &args),
         Command::Drop(args) => item::drop(context, &args),
         Command::Restore(args) => item::restore(context, &args),
+        Command::Archive(args) => archive::archive(context, &args),
+        Command::Unarchive(args) => archive::unarchive(context, &args),
+        Command::Merge(args) => merge::merge(context, &args),
         Command::Group(nested) => match nested.command {
             GroupCommand::List => group::list(context),
             GroupCommand::Add(args) => group::add(context, &args),
@@ -99,6 +104,11 @@ fn list(context: &Context, args: &ListArgs) -> Result<()> {
     if !args.all {
         records.retain(|record| !record.lifecycle().is_dropped());
     }
+    if args.archived {
+        records.retain(|record| workspace.is_archived(record));
+    } else if !args.include_archived {
+        records.retain(|record| !workspace.is_archived(record));
+    }
     let groups = unique_values(&args.group);
     for group in &groups {
         if !workspace.config().has_group(group) {
@@ -127,6 +137,36 @@ fn list(context: &Context, args: &ListArgs) -> Result<()> {
                 .any(|status| state == *status || raw_status.as_deref() == Some(*status))
         });
     }
+    let merge_roles = unique_values(&args.merge_role);
+    if !merge_roles.is_empty() {
+        records.retain(|record| {
+            let is_source = !record.references("merged_into").is_empty();
+            let is_result = !record.references("merged_from").is_empty();
+            merge_roles.iter().any(|role| match *role {
+                "source" => is_source,
+                "result" => is_result,
+                "none" => !is_source && !is_result,
+                _ => false,
+            })
+        });
+    }
+    let reference_health = unique_values(&args.reference_health);
+    if !reference_health.is_empty() {
+        let known = workspace.index().by_id();
+        let config = workspace.config();
+        records.retain(|record| {
+            reference_health
+                .iter()
+                .any(|expected| reference_health_for(config, record, &known) == *expected)
+        });
+    }
+    if args.needs_review {
+        records.retain(|record| {
+            record
+                .get("needs_review")
+                .is_some_and(|value| value.display() == "true")
+        });
+    }
     let labels = crate::output::labels(&language);
     let mut filters = Vec::new();
     let or = crate::i18n::text("filter_or", &language);
@@ -140,8 +180,30 @@ fn list(context: &Context, args: &ListArgs) -> Result<()> {
     if !statuses.is_empty() {
         filters.push(filter_description(labels.status_filter(), &statuses, or));
     }
+    if !merge_roles.is_empty() {
+        filters.push(filter_description(
+            labels.merge_role_filter(),
+            &merge_roles,
+            or,
+        ));
+    }
+    if !reference_health.is_empty() {
+        filters.push(filter_description(
+            labels.reference_health_filter(),
+            &reference_health,
+            or,
+        ));
+    }
+    if args.needs_review {
+        filters.push(labels.needs_review_filter().to_string());
+    }
     if args.all {
         filters.push(labels.all_filter().to_string());
+    }
+    if args.archived {
+        filters.push(labels.archived_only().to_string());
+    } else if args.include_archived {
+        filters.push(labels.include_archived().to_string());
     }
     let mut list_header = crate::output::fill(labels.list_count(), &[&records.len().to_string()]);
     if !filters.is_empty() {
@@ -158,6 +220,32 @@ fn list(context: &Context, args: &ListArgs) -> Result<()> {
         &records,
         Some(&list_header),
     )
+}
+
+fn reference_health_for(
+    config: &crate::workspace::config::Config,
+    record: &crate::record::Record,
+    known_ids: &std::collections::BTreeMap<String, &crate::record::Record>,
+) -> &'static str {
+    let Ok(id) = record.id() else {
+        return "error";
+    };
+    let mut issues = Vec::new();
+    let mut warnings = Vec::new();
+    crate::checks::check_record(config, record, id, known_ids, &mut issues, &mut warnings);
+    if issues
+        .iter()
+        .any(|issue| issue.kind == crate::checks::IssueKind::BrokenReference)
+    {
+        "error"
+    } else if warnings
+        .iter()
+        .any(|warning| warning.kind == crate::checks::IssueKind::DeprecatedReference)
+    {
+        "warning"
+    } else {
+        "ok"
+    }
 }
 
 fn unique_values(values: &[String]) -> Vec<&str> {
@@ -181,6 +269,9 @@ fn search(context: &Context, args: &SearchArgs) -> Result<()> {
     let mut records = workspace.index().search(&args.query);
     if !args.all {
         records.retain(|record| !record.lifecycle().is_dropped());
+    }
+    if !args.include_archived {
+        records.retain(|record| !workspace.is_archived(record));
     }
     item::print_records(context.mode, &language, workspace.config(), &records, None)
 }

@@ -73,6 +73,12 @@ pub enum Command {
     Drop(DropArgs),
     /// 恢复一条已废弃记录，保留原业务状态
     Restore(RestoreArgs),
+    /// 将一条或多条记录移入归档目录
+    Archive(ArchiveArgs),
+    /// 将一条或多条记录从归档目录移回活动记录
+    Unarchive(UnarchiveArgs),
+    /// 将多条同 kind 记录合并为一条新记录
+    Merge(MergeArgs),
     /// 一级 group 的查看与新建
     Group(GroupArgs),
     /// kind 定义的查看与检查
@@ -134,9 +140,29 @@ pub struct ListArgs {
     #[arg(long, value_name = "状态")]
     pub status: Vec<String>,
 
+    /// 筛选合并角色；可重复指定，同字段 OR 匹配
+    #[arg(long, value_name = "source|result|none", value_parser = ["source", "result", "none"])]
+    pub merge_role: Vec<String>,
+
+    /// 筛选实时引用健康度；可重复指定，同字段 OR 匹配
+    #[arg(long, value_name = "ok|warning|error", value_parser = ["ok", "warning", "error"])]
+    pub reference_health: Vec<String>,
+
+    /// 只看待复核的合并记录
+    #[arg(long)]
+    pub needs_review: bool,
+
     /// 包含已废弃记录
     #[arg(long)]
     pub all: bool,
+
+    /// 包含归档记录
+    #[arg(long, conflicts_with = "archived")]
+    pub include_archived: bool,
+
+    /// 只显示归档记录
+    #[arg(long)]
+    pub archived: bool,
 }
 
 #[derive(Debug, Args)]
@@ -148,6 +174,10 @@ pub struct SearchArgs {
     /// 包含已废弃记录
     #[arg(long)]
     pub all: bool,
+
+    /// 包含归档记录
+    #[arg(long)]
+    pub include_archived: bool,
 }
 
 #[derive(Debug, Args)]
@@ -179,6 +209,10 @@ pub struct UpdateArgs {
     /// 跳过写入前的内容比对，直接用本次内容覆盖（外部改动会被丢弃）
     #[arg(long)]
     pub force: bool,
+
+    /// 清除合并记录的待复核标记
+    #[arg(long)]
+    pub reviewed: bool,
 }
 
 #[derive(Debug, Args)]
@@ -216,6 +250,59 @@ pub struct RestoreArgs {
     /// 稳定 ID
     #[arg(value_name = "ID")]
     pub id: String,
+}
+
+#[derive(Debug, Args)]
+pub struct ArchiveArgs {
+    /// 一条或多条稳定记录 ID；批量移动前会检查所有 ID 与目标路径
+    #[arg(value_name = "ID", required = true, num_args = 1..)]
+    pub ids: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct UnarchiveArgs {
+    /// 一条或多条稳定记录 ID；批量移动前会检查所有 ID 与目标路径
+    #[arg(value_name = "ID", required = true, num_args = 1..)]
+    pub ids: Vec<String>,
+}
+
+#[derive(Debug, Args)]
+pub struct MergeArgs {
+    /// 两条或多条来源记录的稳定 ID
+    #[arg(value_name = "ID", required = true, num_args = 2..)]
+    pub ids: Vec<String>,
+
+    /// 新记录标题
+    #[arg(long, value_name = "文本")]
+    pub title: String,
+
+    /// 新记录所属一级 group
+    #[arg(long, value_name = "group 名称")]
+    pub group: String,
+
+    /// 显式选择冲突的 kind 字段值，可重复
+    #[arg(long = "set", value_name = "字段=值", value_parser = parse_assignment)]
+    pub set: Vec<(String, String)>,
+
+    /// 显式设置新记录的父项
+    #[arg(long, value_name = "ID", conflicts_with = "no_parent")]
+    pub parent: Option<String>,
+
+    /// 明确将新记录设置为无父项
+    #[arg(long, conflicts_with = "parent")]
+    pub no_parent: bool,
+
+    /// 冲突时显式提供完成说明；未验证时可用“未验证：...”
+    #[arg(long, value_name = "文本")]
+    pub completion_note: Option<String>,
+
+    /// 冲突时显式提供完成证据
+    #[arg(long, value_name = "文本")]
+    pub completion_evidence: Option<String>,
+
+    /// 只预览候选 ID、冲突和引用改写，不写记录
+    #[arg(long)]
+    pub dry_run: bool,
 }
 
 #[derive(Debug, Args)]
@@ -298,6 +385,10 @@ pub struct SummaryArgs {
     /// 以交接摘要形式呈现
     #[arg(long)]
     pub handoff: bool,
+
+    /// 包含归档记录
+    #[arg(long)]
+    pub include_archived: bool,
 }
 
 /// 解析 `字段=值`；缺失 `=` 时由 clap 报用法错误。
@@ -349,7 +440,16 @@ fn localize(command: clap::Command, english: bool, parent: &str) -> clap::Comman
                 section_options
             };
             let mut arg = arg.help_heading(heading);
-            let help = if current == "list" && matches!(id.as_str(), "group" | "kind" | "status") {
+            let help = if current == "list"
+                && matches!(
+                    id.as_str(),
+                    "group"
+                        | "kind"
+                        | "status"
+                        | "merge_role"
+                        | "reference_health"
+                        | "needs_review"
+                ) {
                 crate::i18n::optional_text(&format!("list_arg_{id}"), locale)
             } else {
                 crate::i18n::argument_help(&id, locale)

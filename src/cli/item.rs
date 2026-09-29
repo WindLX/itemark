@@ -172,6 +172,9 @@ pub fn update(context: &Context, args: &UpdateArgs) -> Result<()> {
         for (section, line) in &args.append {
             record.body.append_line(section, line);
         }
+        if args.reviewed {
+            record.remove("needs_review");
+        }
         let known: Vec<String> = transaction
             .records()
             .iter()

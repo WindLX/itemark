@@ -2,6 +2,7 @@
 
 pub mod config;
 pub mod lock;
+pub mod merge;
 
 use std::path::{Path, PathBuf};
 
@@ -23,7 +24,7 @@ impl Workspace {
     /// 读取项目配置，并从当前记录现场构建查询索引。默认只读，不加锁。
     pub fn open(config_path: &Path, root_override: Option<&Path>) -> Result<Self> {
         let config = Config::load(config_path, root_override)?;
-        let index = ItemIndex::scan(&config.items_dir())?;
+        let index = ItemIndex::scan_with_archive(&config.items_dir(), &config.archive_dir())?;
         Ok(Self {
             config,
             index,
@@ -45,7 +46,7 @@ impl Workspace {
         std::fs::create_dir_all(config.items_dir())
             .map_err(|error| WorkspaceError::from(error).at(&config.items_dir()))?;
         let lock = ProjectLock::acquire(&config.root)?;
-        let index = ItemIndex::scan(&config.items_dir())?;
+        let index = ItemIndex::scan_with_archive(&config.items_dir(), &config.archive_dir())?;
         Ok(Self {
             config,
             index,
@@ -58,9 +59,15 @@ impl Workspace {
         &self.index
     }
 
+    #[must_use]
+    pub fn is_archived(&self, record: &Record) -> bool {
+        record.path.starts_with(self.config.archive_dir())
+    }
+
     /// 重新构建索引；写操作后使用，保证同一次调用内的读取看到最新记录。
     pub fn refresh(&mut self) -> Result<()> {
-        self.index = ItemIndex::scan(&self.config.items_dir())?;
+        self.index =
+            ItemIndex::scan_with_archive(&self.config.items_dir(), &self.config.archive_dir())?;
         Ok(())
     }
 
@@ -190,11 +197,11 @@ impl Transaction<'_> {
                 draft.id()?
             )));
         }
-        let new_path = self
-            .workspace
-            .config
-            .items_dir()
-            .join(crate::record::file_name(id, draft.title()));
+        let directory = old_path
+            .parent()
+            .map(Path::to_path_buf)
+            .unwrap_or_else(|| self.workspace.config.items_dir());
+        let new_path = directory.join(crate::record::file_name(id, draft.title()));
         if new_path != old_path && new_path.exists() {
             return Err(
                 WorkspaceError::runtime(format!("file already exists for `{id}`")).at(&new_path),
@@ -210,6 +217,98 @@ impl Transaction<'_> {
         }
         self.workspace.note_written(&new_path, text)?;
         Ok(new_path)
+    }
+
+    /// 将一批记录移动到 archive；全部 ID 和目标冲突预检通过后才开始移动。
+    pub fn archive_many(&mut self, ids: &[String]) -> Result<Vec<PathBuf>> {
+        self.move_records(ids, true)
+    }
+
+    /// 将一批归档记录移回 items；不修改其废弃标记或业务状态。
+    pub fn unarchive_many(&mut self, ids: &[String]) -> Result<Vec<PathBuf>> {
+        self.move_records(ids, false)
+    }
+
+    pub fn archive(&mut self, id: &str) -> Result<PathBuf> {
+        Ok(self.archive_many(&[id.to_string()])?.remove(0))
+    }
+
+    pub fn unarchive(&mut self, id: &str) -> Result<PathBuf> {
+        Ok(self.unarchive_many(&[id.to_string()])?.remove(0))
+    }
+
+    fn move_records(&mut self, ids: &[String], archived: bool) -> Result<Vec<PathBuf>> {
+        let mut unique_ids = Vec::new();
+        for id in ids {
+            if !unique_ids.contains(id) {
+                unique_ids.push(id.clone());
+            }
+        }
+
+        let mut moves = Vec::with_capacity(unique_ids.len());
+        for id in unique_ids {
+            let matches: Vec<&Record> = self
+                .workspace
+                .index()
+                .records()
+                .iter()
+                .filter(|record| record.id().ok() == Some(id.as_str()))
+                .collect();
+            let record = match matches.as_slice() {
+                [] => {
+                    return Err(WorkspaceError::usage(format!(
+                        "unknown Itemark item `{id}`"
+                    )));
+                }
+                [record] => *record,
+                _ => {
+                    return Err(WorkspaceError::runtime(format!(
+                        "Itemark item `{id}` exists in more than one location"
+                    )));
+                }
+            };
+
+            let source = record.path.clone();
+            let currently_archived = self.workspace.is_archived(record);
+            let target_directory = if archived {
+                self.workspace.config.archive_dir()
+            } else {
+                self.workspace.config.items_dir()
+            };
+            let target = if currently_archived == archived {
+                source.clone()
+            } else {
+                let filename = source.file_name().ok_or_else(|| {
+                    WorkspaceError::runtime(format!("Itemark item `{id}` has no filename"))
+                        .at(&source)
+                })?;
+                target_directory.join(filename)
+            };
+            if target != source && target.exists() {
+                return Err(WorkspaceError::runtime(format!(
+                    "archive destination already exists for `{id}`"
+                ))
+                .at(&target));
+            }
+            moves.push((source, target));
+        }
+
+        for (source, target) in &moves {
+            if source == target {
+                continue;
+            }
+            let parent = target.parent().expect("archive destination has a parent");
+            std::fs::create_dir_all(parent)
+                .map_err(|error| WorkspaceError::from(error).at(parent))?;
+        }
+        for (source, target) in &moves {
+            if source != target {
+                std::fs::rename(source, target)
+                    .map_err(|error| WorkspaceError::from(error).at(target))?;
+            }
+        }
+        self.workspace.refresh()?;
+        Ok(moves.into_iter().map(|(_, target)| target).collect())
     }
 }
 

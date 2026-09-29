@@ -264,6 +264,95 @@ fn list_help_explains_repeatable_or_and_and_filter_values() {
     assert!(en.contains("OR") && en.contains("AND"), "{en}");
 }
 
+#[test]
+fn list_filters_merge_role_reference_health_and_review_state() {
+    let project = Project::new();
+    project.configure();
+
+    project.write(
+        "itemark/items/IM-1-有效.md",
+        "---\nid: IM-1\nkind: work\ngroup: 产品\ntitle: 有效\nstatus: todo\n---\n\n## 目标\n\n有效记录\n",
+    );
+    project.write(
+        "itemark/items/IM-2-已废弃.md",
+        "---\nid: IM-2\nkind: work\ngroup: 产品\ntitle: 已废弃\nstatus: todo\ndropped: true\n---\n\n## 目标\n\n废弃目标\n",
+    );
+    project.write(
+        "itemark/items/IM-3-source.md",
+        "---\nid: IM-3\nkind: work\ngroup: 产品\ntitle: 来源角色\nstatus: todo\nmerged_into: IM-99\nparent: IM-99\n---\n\n## 目标\n\n来源记录\n",
+    );
+    project.write(
+        "itemark/items/IM-4-result.md",
+        "---\nid: IM-4\nkind: work\ngroup: 研究\ntitle: 结果角色\nstatus: todo\nmerged_from: [IM-1]\n---\n\n## 目标\n\n结果记录\n",
+    );
+    project.write(
+        "itemark/items/IM-5-both.md",
+        "---\nid: IM-5\nkind: work\ngroup: 产品\ntitle: 双重角色待复核\nstatus: todo\nmerged_into: IM-99\nmerged_from: [IM-1]\nparent: IM-99\nneeds_review: true\n---\n\n## 目标\n\n双重角色记录\n",
+    );
+    project.write(
+        "itemark/items/IM-6-warning.md",
+        "---\nid: IM-6\nkind: work\ngroup: 产品\ntitle: 引用警告\nstatus: todo\nparent: IM-2\n---\n\n## 目标\n\n引用已废弃记录\n",
+    );
+    project.write(
+        "itemark/items/IM-7-reviewed-marker.md",
+        "---\nid: IM-7\nkind: work\ngroup: 研究\ntitle: 单独复核标记\nstatus: todo\nneeds_review: true\nparent: IM-1\n---\n\n## 目标\n\n复核标记本身不是引用问题\n",
+    );
+
+    let sources = project.ok(&["list", "--merge-role", "source", "--json"]);
+    assert_eq!(json_ids(&sources, "items"), ["IM-3", "IM-5"]);
+    let results = project.ok(&["list", "--merge-role", "result", "--json"]);
+    assert_eq!(json_ids(&results, "items"), ["IM-4", "IM-5"]);
+    let no_role = project.ok(&["list", "--merge-role", "none", "--json"]);
+    assert_eq!(json_ids(&no_role, "items"), ["IM-1", "IM-6", "IM-7"]);
+
+    let errors = project.ok(&["list", "--reference-health", "error", "--json"]);
+    assert_eq!(json_ids(&errors, "items"), ["IM-3", "IM-5"], "{errors}");
+    let warnings = project.ok(&["list", "--reference-health", "warning", "--json"]);
+    assert_eq!(json_ids(&warnings, "items"), ["IM-6"]);
+    let error_or_warning = project.ok(&[
+        "list",
+        "--reference-health",
+        "error",
+        "--reference-health",
+        "warning",
+        "--json",
+    ]);
+    assert_eq!(
+        json_ids(&error_or_warning, "items"),
+        ["IM-3", "IM-5", "IM-6"]
+    );
+    let healthy = project.ok(&["list", "--reference-health", "ok", "--json"]);
+    assert_eq!(json_ids(&healthy, "items"), ["IM-1", "IM-4", "IM-7"]);
+
+    let reviewed = project.ok(&["list", "--needs-review", "--json"]);
+    assert_eq!(json_ids(&reviewed, "items"), ["IM-5", "IM-7"]);
+    let text = project.ok(&[
+        "list",
+        "--merge-role",
+        "source",
+        "--merge-role",
+        "result",
+        "--reference-health",
+        "error",
+        "--needs-review",
+    ]);
+    assert!(text.contains("合并角色=source 或 result"), "{text}");
+    assert!(text.contains("引用健康度=error"), "{text}");
+    assert!(text.contains("需要复核"), "{text}");
+    let combined = project.ok(&[
+        "list",
+        "--merge-role",
+        "source",
+        "--merge-role",
+        "result",
+        "--reference-health",
+        "error",
+        "--needs-review",
+        "--json",
+    ]);
+    assert_eq!(json_ids(&combined, "items"), ["IM-5"]);
+}
+
 fn json_ids(json: &str, key: &str) -> Vec<String> {
     serde_json::from_str::<serde_json::Value>(json).expect("valid JSON output")[key]
         .as_array()

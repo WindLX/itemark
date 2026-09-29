@@ -70,6 +70,10 @@ labels! {
     field_line => "field_line"; no_matches => "no_matches"; list_count => "list_count";
     list_filter => "list_filter"; group_filter => "group_filter"; kind_filter => "kind_filter";
     status_filter => "status_filter"; all_filter => "all_filter";
+    merge_role_filter => "merge_role_filter"; reference_health_filter => "reference_health_filter";
+    needs_review_filter => "needs_review_filter";
+    include_archived => "include_archived"; archived_only => "archived_only";
+    archive_completed => "archive_completed"; unarchive_completed => "unarchive_completed";
 }
 
 /// 用语言相关的句子模板渲染人读文本：模板里的 `{}` 按顺序被 `parts` 填充。

@@ -81,12 +81,13 @@ impl Overview {
 
 /// 从当前项目状态构建总览。
 #[must_use]
-pub fn build(workspace: &Workspace, generated_at: String) -> Overview {
+pub fn build(workspace: &Workspace, generated_at: String, include_archived: bool) -> Overview {
     let config = workspace.config();
     let entries = workspace
         .index()
         .records()
         .iter()
+        .filter(|record| include_archived || !workspace.is_archived(record))
         .filter_map(|record| entry_of(config, record))
         .collect();
     Overview {
