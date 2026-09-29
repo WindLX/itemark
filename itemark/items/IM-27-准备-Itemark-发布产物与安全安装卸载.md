@@ -14,6 +14,8 @@ depends_on:
 - IM-32
 - IM-33
 - IM-34
+- IM-35
+- IM-36
 completion_evidence: 当前 Cargo package 为 itemark 0.1.0，repository 为 https://github.com/WindLX/itemark；手动release-artifacts workflow仅上传限期workflow artifacts。公开Release资产尚不存在；LZB报告Unix临时归档安装/卸载测试通过，Windows PowerShell未本机实测。
 ---
 
@@ -27,7 +29,7 @@ completion_evidence: 当前 Cargo package 为 itemark 0.1.0，repository 为 htt
 
 ## 当前下一步
 
-本事项等待当前批次及后续设计/功能事项IM-22、IM-28至IM-34收尾；最终外部发布另需用户确认。
+等待当前批次及后续事项 IM-22、IM-28 至 IM-36 收尾；公开发布前仍需用户最终确认。
 
 ## 历史进展
 

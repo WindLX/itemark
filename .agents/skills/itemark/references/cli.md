@@ -28,13 +28,15 @@ Itemark 是本地 Rust + Clap 同步 CLI。每个 kind 由项目配置和 Markdo
 | `init` | 为新项目创建 `itemark.toml`、`general` group、可编辑的 `work` / `fact` / `term` kind starter 和 Markdown 模板。已有配置不注入 starter，即使使用 `--force`。 |
 | `add` | 按指定 kind 添加记录；可暂缺必填内容，稳定 ID 由 Itemark 分配，文件名同时含 ID 与标题摘要。 |
 | `show` | 按稳定 ID 查看一条记录。 |
-| `list` | 列出记录，可按 kind、状态或 group 过滤；例如工作事项用 `itemark list --status in_progress` 或 `--status todo`。这三个筛选选项可重复。 |
-| `search` | 搜索当前记录内容；引用通过稳定 ID 跨 group 指向原记录。 |
+| `list` | 列出记录；可筛选业务状态、group、kind、待复核、聚合角色、引用健康度或归档状态。多值筛选规则见下方维度表。 |
+| `search` | 搜索当前记录内容；可用 `--include-archived` 包含归档记录。引用通过稳定 ID 跨 group 指向原记录。 |
 | `update` | 定点更新字段或指定正文节；也可移动记录到另一个 group。 |
 | `log` | 即时追加一条带日期的进展记录。 |
 | `drop` / `restore` | 废弃或恢复任一 kind 的记录；恢复保留废弃前的业务状态。 |
+| `archive` / `unarchive` | 按稳定 ID 批量归档或取消归档；不改变业务状态或 `dropped` 标记。 |
 | `group list/add/show` | 查看、新建或查看一级 group；group 可包含不同 kind。 |
 | `kind list/show/check` | 查看并检查项目配置中的 kind；不提供逐字段 schema 编辑器。 |
+| `merge` | 将至少两条同 kind 来源聚合为一个新 ID，按明确规则重定向关系。 |
 | `check` | 检查记录必填项、正文节、关系及适用的完成条件。 |
 | `summary` | 生成当前总览或交接，注明来源 ID 和生成时点；默认只输出，显式指定保存位置后才写文件。`--handoff` 只列进行中、阻塞、完成但未验证三类及其下一步，`--json` 下返回同一交接结构而不是总览结构。 |
 
@@ -47,9 +49,11 @@ Itemark 是本地 Rust + Clap 同步 CLI。每个 kind 由项目配置和 Markdo
 | `init` | `--force` |
 | `add` | `--kind <名称>`、`--group <名称>`（必填）；`--title <文本>`、可重复 `--set <字段=值>`、`--body <文件>` |
 | `show` | `<ID>` |
-| `list` | 可重复使用的筛选：`--group <名称>`、`--kind <名称>`、`--status <状态>`；`--all` 包含已废弃项 |
-| `search` | `<文本>`；`--all` 包含已废弃项 |
-| `update` | `<ID>`；可重复 `--set <字段=值>`、`--unset <字段>`、`--section <分节=内容>`、`--append <分节=行>`；`--group <名称>`；`--force` 跳过旧内容比对 |
+| `list` | 可重复 `--group`、`--kind`、`--status`、`--merge-role`、`--reference-health`；`--needs-review`；`--all`；`--include-archived`；`--archived` |
+| `search` | `<文本>`；`--all`；`--include-archived` |
+| `archive` / `unarchive` | 一个或多个 `<ID>...` |
+| `merge` | 一个或多个 `<ID>...`（至少两条不同来源）；必填 `--title`、`--group`；可重复 `--set`；`--parent <ID>` 或 `--no-parent`；`--completion-note`、`--completion-evidence`；`--dry-run` |
+| `update` | `<ID>`；可重复 `--set <字段=值>`、`--unset <字段>`、`--section <分节=内容>`、`--append <分节=行>`；`--group <名称>`；`--force` 跳过旧内容比对；`--reviewed` 清除待复核标记 |
 | `log` | `<ID> <文本>`；`--date <YYYY-MM-DD>`、可重复 `--section <名称=内容>` |
 | `drop` | `<ID>`；`--reason <文本>` |
 | `restore` | `<ID>` |
@@ -58,7 +62,7 @@ Itemark 是本地 Rust + Clap 同步 CLI。每个 kind 由项目配置和 Markdo
 | `kind list` | 无专属参数 |
 | `kind show` / `kind check` | 可选 `[kind 名称]` |
 | `check` | 可选 `[ID]`；省略时检查所有记录 |
-| `summary` | `--at <时间戳>`、`--save <文件>`、`--handoff` |
+| `summary` | `--at <时间戳>`、`--save <文件>`、`--handoff`、`--include-archived` |
 
 `update --force` 会跳过写入前旧内容比对，外部修改可能被本次结果覆盖。示例和值定义仍以项目配置与当前 CLI 行为为准。
 
@@ -70,7 +74,7 @@ Itemark 是本地 Rust + Clap 同步 CLI。每个 kind 由项目配置和 Markdo
 
 普通写入即校验 `parent`、`depends_on` 指向的 ID 存在且不是自引用：`depends_on` 可用 `[IM-42, IM-43]` 或 `IM-42,IM-43` 的列表写法，`parent` 只接受单个 ID。
 
-这类结构关系按事项 ID 工作。正文内稳定引用的语法及对缺失、废弃或归档目标的检查行为仍在讨论，本参考不将其描述为当前可用功能。
+正文稳定引用使用 `[[IM-N]]` 或 `[[IM-N|显示文字]]`，普通引用不会自动形成 `depends_on`。`check` 与引用健康筛选覆盖正文引用、parent 和 depends_on：缺失目标为 error，废弃目标为 warning，归档目标仍有效；代码块和行内代码中的示例会跳过。
 
 `update` 在写入前比对本次操作开始时读到的原文与磁盘内容；不一致即报冲突并以非零状态退出，不静默覆盖。`--force` 只跳过这一步（直接用本次结果覆盖，外部改动会被丢弃），字段与引用校验、完成条件、ID 与格式校验、项目写锁照常生效。
 
@@ -85,17 +89,36 @@ kind 可选地声明一个完成字段及完成值（配置键 `completion_field
 3. 用 `update` 改标题、配置字段或一个正文节，或将记录移动到另一 group；用 `log` 追加进展。未触碰的 Markdown 正文继续保留。
 4. 用 `drop` 暂停记录，之后 `restore` 回到原业务状态；用 `check` 查看尚缺的必填信息。
 5. 用 `summary` 在 stdout 查看交接；只有明确要求保存时才传入保存位置。用 `--json` 可把同一结果交给脚本读取。
+6. 用 `itemark list --status todo --status in_progress --merge-role result --reference-health warning` 组合过滤；同字段多个值按 OR，不同字段按 AND。
+7. 用 `archive <ID>` 归档记录，用 `list --archived` 检查；需要恢复到活动目录时运行 `unarchive <ID>`。`list/search/summary --include-archived` 可与活动记录一起查询。
+8. 对至少两条同 kind 来源先运行 `merge <ID-1> <ID-2> --title "新标题" --group 研究 --dry-run` 查看候选 ID 和改写计划，确认后去掉 `--dry-run` 执行；冲突值通过 `--set`、`--parent/--no-parent` 或完成依据参数明确解决。
 
 这些场景在 CLI 中已可执行。记录的权威来源是 Markdown 文件；总览和交接由当前文件生成，不构成第二份状态。语言设置只影响 CLI 固定文案，不会更改模板创建后的用户正文。
 
-## 已确认设计（当前尚未实现）
+## 状态、归档、聚合与查询维度
 
-归档与废弃是独立生命周期。计划命令为 `itemark archive <ID>...` 和 `itemark unarchive <ID>...`；归档保留 ID 与业务状态，记录移至唯一来源目录 `<root>/archive`。默认 `list`、`search`、`summary` 隐藏归档项；三者提供 `--include-archived`，`list --archived` 仅显示归档项。`--all` 只控制废弃项，和归档选项互相独立。`show`、`check` 与按 ID 引用仍跨 `items/` 和 `archive/` 工作。
+这些维度彼此独立，不能相互替代。记录字段和聚合元数据保存在条目 Markdown 头部；归档由文件位置表示；引用健康度在查询时根据当前引用重新计算。
 
-计划的聚合命令为 `itemark merge <ID>... --title <标题> --group <group> [--set FIELD=VALUE ...] [--parent <ID>] [--dry-run]`。参数重复去重后须至少有两个不同 ID；来源必须同 kind，可跨 group；已归档来源可合并，废弃来源须先 `restore`。标题和目标 group 必须明确指定。`--dry-run` 展示候选 ID 与结果，不分配或保留 ID；正式写入在锁内重建索引、重新验证并分配 ID。
+| 维度 | 存储或计算方式 | 当前 CLI 行为 |
+| --- | --- | --- |
+| 工作业务状态 | kind 声明的字段与原始值，例如 `status=todo`；不翻译 | `list --status` 可重复；同值 OR。 |
+| 通用生命周期 | `dropped: true` 表示废弃；未标记为有效 | `drop` / `restore`；`list`、`search` 用 `--all` 包含废弃项。 |
+| 归档 | 文件位于唯一数据源 `<root>/archive/`；归档不改变业务状态或 `dropped` | `archive <ID>...` / `unarchive <ID>...`。默认 list/search/summary 隐藏归档；三者可用 `--include-archived`，list 的 `--archived` 只列归档项。归档与 `--all` 独立；show、check、ID 引用仍跨 items/archive 有效。 |
+| 待复核 | 聚合结果头部的独立 `needs_review: true` 标记，不是业务状态 | `list --needs-review` 筛选，`check` 发出待复核提示，`update <ID> --reviewed` 清除标记；不改变业务状态，完成依据规则照常生效。 |
+| 聚合角色 | `merged_into` / `merged_from` 是持久元数据；source/result 角色由它们派生，一项可同时具备两种角色 | `list --merge-role source|result|none` 可重复；`none` 表示两种元数据都不存在。 |
+| 引用健康度 | 每次 list 查询时根据当前的正文引用、parent 与 depends_on 引用诊断计算，不持久化 | `list --reference-health ok|warning|error` 可重复；取最高严重级 `error > warning > ok`。只看引用错误和已废弃引用警告，不把待复核等其他检查问题算入。 |
 
-聚合字段中，相同值直接保留，只有一个非空值时保留；不同值（包括业务状态或 parent）必须显式解决，禁止静默覆盖。`--set` 只设置 kind 声明字段，parent 使用专门选项。来源归档后记录 `merged_into`，原历史只追加去向，不改写来源历史或代码示例；新项以 `merged_from` 保留来源 ID。普通正文引用、外部 `depends_on` 和 parent 指向新项；聚合项的依赖取来源外部依赖并集、去重并排除来源之间的依赖。重定向不得产生自引用或重复关系。
+所有可重复的 list 条件在同字段内按 OR 匹配，不同字段之间按 AND 组合；重复值只参与一次。逗号是字面值，不拆分。`search` 和 `summary` 不接受上述筛选维度；它们只提供 `--include-archived`。
 
-新聚合项带独立的 `needs_review` 标记。计划 `list --needs-review` 筛选该标记，`check` 对其提示，`update <ID> --reviewed` 清除它；这不改变业务状态，完成值的完成说明与证据规则仍适用。写入前准备所有结果并检查字段与关系冲突；若未先解决则不开始写入。此操作不承诺跨文件事务原子性：I/O 错误返回非零并说明已完成/未完成范围，可做简单回滚，不引入事务日志框架。以上命令和行为是已确认设计，尚待实现；安装版本的可用接口仍以实际 `itemark --help` 为准。
+示例：`itemark list --status todo --status in_progress --merge-role result --reference-health warning` 同时匹配待办或进行中状态、聚合结果角色，并且引用健康度为 warning；`itemark list --needs-review --include-archived` 列出包含归档项的待复核记录。
 
+归档命令为 `itemark archive <ID>...` 与 `itemark unarchive <ID>...`。批量移动会先检查全部 ID 和目标路径；取消归档不改变 `dropped` 标记或业务状态。
+
+聚合命令为 `itemark merge <ID>... --title <文本> --group <group> [--set FIELD=VALUE ...] [--parent <ID> | --no-parent] [--completion-note <文本>] [--completion-evidence <文本>] [--dry-run]`。输入至少为两条去重后的不同 ID，须同 kind；跨 group 合并允许，归档来源允许，废弃来源须先 restore。标题和目标 group 必须明确指定。dry-run 显示候选 ID、冲突和引用改写，不分配或保留 ID；正式操作在写锁内重建索引、重验并分配新 ID。
+
+字段值一致时保留；多个来源中仅一个非空值时保留。不同字段值（包括 status 和 parent）须显式解决，禁止静默覆盖；`--set` 只设置 kind 字段，parent 使用互斥的 `--parent` / `--no-parent`。完成说明或证据冲突须用完成参数明确提供，不通过 `--set`。若 kind 声明了完成值，新项仍须满足完成说明与证据或明确未验证说明的规则。
+
+来源记录移至 archive 并保存 `merged_into`，其原 Markdown 正文和历史不改；聚合结果以 `merged_from` 保存来源 ID。合并只改写来源集合以外记录指向来源 ID 的普通正文引用、depends_on 与 parent；代码示例和来源记录内容不改。新项的 depends_on 取来源外部依赖并集、去重并排除来源间依赖。重定向不产生重复关系或自依赖。
+
+合并结果带有待复核标记；它不更改业务状态。写入前先准备所有结果并检查字段、冲突和关系；若尚未解决则不开始写入。操作不承诺跨文件事务原子性：I/O 错误返回非零并准确说明完成范围，可做简单回滚，不引入事务日志框架。实际可用选项以当前安装版本的 `itemark --help` 为准。
 建议的新项目布局为 `itemark.toml`、`<root>/items/`、`<root>/templates/` 和 `<root>/summaries/`。这是布局建议，不要求其他项目自动迁移既有手工记录。
