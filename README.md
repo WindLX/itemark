@@ -4,13 +4,13 @@
 
 ## 当前状态
 
-Itemark CLI 已实现（`itemark` 二进制，仓库门禁为 `just ci`），本仓库用它自举管理自身事项，配置入口为 `itemark.toml`、数据目录为 `itemark/`。目前尚未发布预编译安装包；下列 Markdown 文档承载需求、领域词汇与设计约定。
+Itemark CLI 已实现（`itemark` 二进制，仓库门禁为 `just ci`），本仓库用它自举管理自身事项，配置入口为 `itemark.toml`、数据目录为 `itemark/`。目前尚未发布 GitHub Release 或 crates.io crate；下列 Markdown 文档承载需求、领域词汇与设计约定。
 
 从源码运行：安装 Rust 工具链后，在仓库内运行 `cargo build --release`，再执行 `target/release/itemark <命令>`；开发时也可用 `cargo run -q -- <命令>`。也可在源码仓库安装到 Cargo 的用户级二进制目录：`cargo install --locked --path .`，之后用 `cargo uninstall itemark` 卸载。该方式只安装 CLI，不安装 skill，也不触碰项目记录。crate 尚未发布到 crates.io，因此目前不能使用 `cargo install itemark`。
 
 ## 预编译安装
 
-GitHub Release 资产尚未发布。维护者可在 GitHub Actions 手动运行 `Release artifacts (manual)` workflow 并输入版本号，生成保留 30 天的工作流产物；这不代表已发布版本。产物包含 Linux `x86_64-unknown-linux-gnu` / `aarch64-unknown-linux-gnu`、macOS `x86_64-apple-darwin` / `aarch64-apple-darwin`、Windows `x86_64-pc-windows-msvc` 二进制归档，以及独立的 `itemark-skill-v<V>.zip` 和 `SHA256SUMS`。拿到相应归档后先核对校验和，再可用仓库脚本安装：
+GitHub Release 资产尚未发布。向 `codex/release-prep` 推送会触发跨平台 CI 和临时产物打包；维护者也可手动运行 `Release artifacts (manual)` workflow，输入版本必须与 `Cargo.toml` 一致。临时 artifacts 保留 30 天，并不代表公开发布。候选版本 `0.1.0` 的五目标打包、原生安装/卸载 smoke、skill 包及 `SHA256SUMS` 已在 [产物 workflow](https://github.com/WindLX/itemark/actions/runs/36532563213) 通过；[跨平台 CI](https://github.com/WindLX/itemark/actions/runs/36532563339) 也已通过。正式 Release 和 crates.io 发布均未执行。产物包含 Linux `x86_64-unknown-linux-gnu` / `aarch64-unknown-linux-gnu`、macOS `x86_64-apple-darwin` / `aarch64-apple-darwin`、Windows `x86_64-pc-windows-msvc` 二进制归档，以及独立的 `itemark-skill-v<V>.zip` 和 `SHA256SUMS`。取得归档后先核对校验和，再可用仓库脚本安装：
 
 ```sh
 # 将路径替换为已下载的 Unix 归档；默认安装到 ~/.local/bin/itemark
@@ -26,7 +26,7 @@ GitHub Release 资产尚未发布。维护者可在 GitHub Actions 手动运行 
 
 Windows 使用 `scripts/install.ps1 -Archive <ZIP路径>` 和 `scripts/uninstall.ps1`；默认安装到 `$LOCALAPPDATA/Programs/Itemark`。安装器可用 `-SkillArchive <ZIP路径> -SkillProfile codex|claude` 同装 skill。skill 包独立于二进制包：Codex profile 默认复制到 `$HOME/.agents/skills/itemark`，Claude profile 默认复制到 `$HOME/.claude/skills/itemark`；可用 `--skill-home` / `-SkillHome` 覆盖 skill 父目录。Unix 安装器支持 `--prefix DIR`，卸载器支持 `--prefix DIR`；PowerShell 对应 `-Prefix DIR`。
 
-Unix 默认安装到 `$HOME/.local/bin/itemark`；Windows 默认安装到 `$LOCALAPPDATA/Programs/Itemark/itemark.exe`。卸载器根据安装 receipt 移除由安装器放置的二进制和带 Itemark 管理标记的个人 skill，保留项目记录与父目录。Unix 本地归档安装和卸载已在临时环境验证；Windows 脚本尚无本机 PowerShell 实测，需由目标平台 CI/实机验证。公开发布必须等所有当前事项完成，并由用户最终确认；当前没有公开下载地址或已发布 Release。
+Unix 默认安装到 `$HOME/.local/bin/itemark`；Windows 默认安装到 `$LOCALAPPDATA/Programs/Itemark/itemark.exe`。卸载器根据安装 receipt 移除由安装器放置的二进制和带 Itemark 管理标记的个人 skill，保留项目记录与父目录。Linux、macOS 和 Windows 的归档安装/卸载 smoke 均由对应原生 runner 实测通过；公开发布仍须等所有事项完成并由用户最终确认，当前没有公开 Release 下载地址。
 
 仓库文档和 CLI 人读提示默认使用简体中文（zh-CN）。项目可在配置中显式设置输出语言；现有记录不会因此被翻译或重写。
 

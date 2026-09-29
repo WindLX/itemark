@@ -3,7 +3,7 @@ id: IM-27
 kind: work
 group: 实现
 title: 准备 Itemark 发布产物与安全安装卸载
-status: in_progress
+status: done
 parent: IM-22
 depends_on:
 - IM-22
@@ -16,7 +16,8 @@ depends_on:
 - IM-34
 - IM-35
 - IM-36
-completion_evidence: Cargo package 为 itemark 0.1.0，元数据指向 crates-io/README.md。crates.io 当前未发布；`cargo publish --dry-run --locked --registry crates-io` 已成功打包编译并明确中止上传。手动 workflow_dispatch 构建 Linux x86_64/aarch64、macOS x86_64/aarch64、Windows x86_64 五目标，另产出独立 skill zip 和 SHA256SUMS，workflow artifacts 保留 30 天，不创建 GitHub Release。Unix 安装/卸载临时环境实测通过；Windows PowerShell 安装/卸载尚未本机实测。
+completion_evidence: 候选版本 0.1.0，准备提交 b83e0ebbdd56b3b9805091313f08a438a7996baa。跨平台 CI https://github.com/WindLX/itemmark/actions/runs/36532563339 五目标全部成功；产物 workflow https://github.com/WindLX/itemmark/actions/runs/36532563213 的版本匹配、五目标release build/package与native安装/卸载smoke、skill打包、SHA256SUMS和bundle上传全部成功。workflow提供7个临时artifacts，总包5.84 MB，保留30天，不是公开Release。cargo publish --dry-run --locked --registry crates-io已成功打包并明确中止上传；未发布crate。
+completion_note: 发布准备验收完成：版本元数据、五目标构建与临时bundle、安装/卸载 smoke、skill 包和校验和均已在原生 CI 验证。未创建 tag、GitHub Release 或发布 crates.io；任何正式公开发布仍须等全部事项完成并取得用户明确确认。
 ---
 
 ## 目标
@@ -29,7 +30,7 @@ completion_evidence: Cargo package 为 itemark 0.1.0，元数据指向 crates-io
 
 ## 当前下一步
 
-确认五目标构建产物与校验和齐全；补做 Windows 安装/卸载目标平台验证；待所有当前事项完成后，由用户决定是否发布。当前只准备流程，不 tag、push 或发布。
+无。公开发布、tag或crates.io上传不属于本次已完成准备；须等所有事项完成并取得用户明确确认。
 
 ## 历史进展
 
@@ -41,7 +42,7 @@ completion_evidence: Cargo package 为 itemark 0.1.0，元数据指向 crates-io
 
 ## 进展
 
-- 2026-09-29：确认当前锁实现直接对目录句柄调用 try_lock；Windows 支持尚待改用专用可写锁文件并在目标 CI 验证。
-- 2026-09-29：已核对 crates.io 官方 sparse index（itemark 路径当前 404）；Cargo include 白名单只保留源码、i18n、bench、清单、许可证和 crate 专用 README，cargo package 编译验证与本机 release 构建通过。跨平台资产脚本和 workflow 由 LZB 继续核验；尚未 tag、创建 GitHub Release 或发布 crate。
-- 2026-09-29：核对根 README、Cargo package README、安装/卸载脚本与手动 artifact workflow；记录源码用户级安装/卸载、五目标及 skill 独立包、30 天 workflow artifacts、Unix 已测/Windows 未实测。`cargo publish --dry-run --locked --registry crates-io` 成功打包并中止上传；仍未创建 tag、push、GitHub Release 或发布 crate。
-- 2026-09-29：cargo publish --dry-run --locked --registry crates-io 完成：仅构建并验证上传包，结尾为 aborting upload due to dry run；未读取/显示凭据或上传。
+- 2026-09-29：确认当前锁实现直接对目录句柄调用 try_lock；Windows 支持尚待改用专用可写锁文件并在目标 CI 验证。后续提交 b83e0eb 已修复 Windows 文件锁测试假设并通过 Windows CI。
+- 2026-09-29：已核对 crates.io 官方 sparse index（itemark 路径当前 404）；Cargo include 白名单只保留源码、i18n、bench、清单、许可证和 crate 专用 README，cargo package 编译验证与本机 release 构建通过。
+- 2026-09-29：核对根 README、Cargo package README、安装/卸载脚本与手动 artifact workflow；`cargo publish --dry-run --locked --registry crates-io` 成功打包并中止上传，未显示凭据或上传。该项重复记录已合并。
+- 2026-09-29：提交 b83e0eb 的跨平台 CI 全部五目标成功；发布产物 workflow 五目标构建、安装/卸载 smoke、skill 包、版本一致性、SHA256SUMS 与 bundle 上传成功。仅生成保留30天的workflow artifacts，未tag、push公开发行、创建GitHub Release或发布crate。
