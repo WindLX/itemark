@@ -50,7 +50,13 @@ fn archive_keeps_ids_status_references_and_can_be_included_in_queries() {
     let renamed = project.ok(&["update", &id, "--set", "title=归档后改名", "--json"]);
     let renamed: serde_json::Value = serde_json::from_str(&renamed).expect("valid update JSON");
     archived_path = PathBuf::from(renamed["path"].as_str().expect("updated record path"));
-    assert!(archived_path.starts_with(project.path().join("itemark/archive")));
+    let archive_root = fs::canonicalize(project.path().join("itemark/archive"))
+        .expect("canonical archive directory");
+    let canonical_archived_path = fs::canonicalize(&archived_path).expect("canonical record path");
+    assert!(
+        canonical_archived_path.starts_with(&archive_root),
+        "updated record path must remain under the archive root: {canonical_archived_path:?}"
+    );
     assert!(!original_archived_path.exists());
     items_path = project
         .path()
