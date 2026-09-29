@@ -34,4 +34,35 @@ jobs:
           cargo fmt --all -- --check
           cargo clippy --locked --all-targets -- -D warnings
       - name: Test
-        run: cargo test --locked
+        if: runner.os != 'Windows'
+        shell: bash
+        run: |
+          log="$RUNNER_TEMP/itemark-cargo-test.log"
+          if cargo test --locked >"$log" 2>&1; then
+            cat "$log"
+          else
+            result=$?
+            cat "$log"
+            {
+              echo '### cargo test failure (last 200 lines)'
+              echo '```text'
+              tail -n 200 "$log"
+              echo '```'
+            } >> "$GITHUB_STEP_SUMMARY"
+            exit "$result"
+          fi
+
+      - name: Test (Windows)
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          $log = Join-Path $env:RUNNER_TEMP 'itemark-cargo-test.log'
+          cargo test --locked 2>&1 | Tee-Object -FilePath $log
+          $testExit = $LASTEXITCODE
+          if ($testExit -ne 0) {
+            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value '### cargo test failure (last 200 lines)'
+            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value '```text'
+            Get-Content -LiteralPath $log -Tail 200 | Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY
+            Add-Content -LiteralPath $env:GITHUB_STEP_SUMMARY -Value '```'
+          }
+          exit $testExit
