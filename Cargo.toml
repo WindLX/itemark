@@ -5,7 +5,18 @@ edition = "2024"
 description = "A local-first work, fact, and terminology tracker backed by editable Markdown records"
 license = "MIT"
 repository = "https://github.com/WindLX/itemark"
-readme = "README.md"
+readme = "crates-io/README.md"
+keywords = ["cli", "markdown", "tracker", "productivity", "knowledge"]
+categories = ["command-line-utilities"]
+include = [
+    "Cargo.toml",
+    "Cargo.lock",
+    "LICENSE",
+    "crates-io/README.md",
+    "src/**",
+    "i18n/**",
+    "benches/**",
+]
 
 [dependencies]
 anstyle = "1.0.14"
