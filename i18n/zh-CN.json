@@ -142,6 +142,7 @@
   "diag_expected_pair": "参数格式应为 KEY=VALUE，当前值：",
   "diag_value_required": "此选项需要一个取值：",
   "diag_none_supplied": "但没有提供取值。",
+  "diag_status_missing_tip": "示例：itemark list --status in_progress。自定义取值请查看 `itemark kind show <名称>`。",
   "diag_empty_key": "字段名不能为空：",
   "diag_invalid_date": "日期格式应为 YYYY-MM-DD，当前值：",
   "diag_field": "字段",

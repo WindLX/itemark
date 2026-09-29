@@ -50,13 +50,37 @@ fn missing_status_value_uses_a_complete_localized_diagnostic() {
     let (_, message) = project.fail(&["list", "--status"]);
     assert!(message.contains("需要一个取值"), "{message}");
     assert!(message.contains("--status <状态>"), "{message}");
+    assert!(
+        message.contains("itemark list --status in_progress"),
+        "{message}"
+    );
     assert!(!message.contains("a value is required"), "{message}");
 
-    let (_, help_message) = project.fail(&["list", "--status", "--help"]);
-    assert!(help_message.contains("需要一个取值"), "{help_message}");
+    let help_message = project.ok(&["list", "--status", "--help"]);
     assert!(
-        !help_message.contains("a value is required"),
+        help_message.contains("用法：itemark list"),
         "{help_message}"
+    );
+    assert!(help_message.contains("筛选状态："), "{help_message}");
+    let help_after_multiple_missing_options =
+        project.ok(&["list", "--group", "--status", "--help"]);
+    assert!(
+        help_after_multiple_missing_options.contains("用法：itemark list"),
+        "{help_after_multiple_missing_options}"
+    );
+
+    set_language(&project, "en");
+    let english_help = project.ok(&["list", "--status", "--help"]);
+    assert!(
+        english_help.contains("Usage: itemark list"),
+        "{english_help}"
+    );
+    assert!(english_help.contains("Status filter:"), "{english_help}");
+    assert!(!english_help.contains("错误："), "{english_help}");
+    let (_, english_error) = project.fail(&["list", "--status"]);
+    assert!(
+        english_error.contains("Example: itemark list --status in_progress"),
+        "{english_error}"
     );
 }
 

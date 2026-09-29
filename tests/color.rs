@@ -112,7 +112,10 @@ fn list_styles_hierarchy_but_keeps_json_clean() {
         .expect("run list with NO_COLOR");
     assert!(no_color.status.success());
     let text = String::from_utf8(no_color.stdout).expect("stdout is UTF-8");
-    assert!(!text.contains(ESC), "NO_COLOR keeps the list plain: {text:?}");
+    assert!(
+        !text.contains(ESC),
+        "NO_COLOR keeps the list plain: {text:?}"
+    );
 }
 
 #[test]

@@ -157,6 +157,7 @@
   "diag_expected_pair": "expected `key=value`, got",
   "diag_value_required": "this option requires a value:",
   "diag_none_supplied": "but no value was supplied.",
+  "diag_status_missing_tip": "Example: itemark list --status in_progress. Inspect custom values with `itemark kind show <NAME>`.",
   "diag_field": "field",
   "diag_invalid_date": "expected `--date` as YYYY-MM-DD, got",
   "diag_invalid_type": "unsupported type",
