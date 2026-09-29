@@ -441,6 +441,7 @@ pub fn print_records(
     language: &str,
     config: &Config,
     records: &[&Record],
+    list_header: Option<&str>,
 ) -> Result<()> {
     if mode.is_json() {
         let items: Vec<serde_json::Value> = records
@@ -453,11 +454,17 @@ pub fn print_records(
         }))?;
         return Ok(());
     }
+    if let Some(header) = list_header {
+        println!("{}\n", paint(style::heading(), header));
+    }
     if records.is_empty() {
         println!("{}", labels(language).no_matches());
         return Ok(());
     }
-    for record in records {
+    for (index, record) in records.iter().enumerate() {
+        if index > 0 {
+            println!();
+        }
         println!("{}", record_line(language, config, record));
     }
     Ok(())
@@ -653,14 +660,14 @@ pub fn record_text(language: &str, config: &Config, record: &Record) -> String {
         record.title(),
     );
     let state = crate::status::of(config, record);
-    if state != crate::status::State::NoStatus {
+    if let Some(status_value) = record.status(config) {
         let key = record
             .kind()
             .ok()
             .and_then(|name| config.kind(name))
             .and_then(crate::workspace::KindConfig::status_field)
             .unwrap_or("status");
-        let state_text = paint(state_style(state), crate::view::state_label(&labels, state));
+        let state_text = paint(state_style(state), &status_value);
         push_line(
             &labels,
             &mut out,
@@ -786,13 +793,13 @@ pub fn record_line(language: &str, config: &Config, record: &Record) -> String {
     let mut line = format!(
         "{} {}\n  {}",
         paint(style::accent(), record.id().unwrap_or("")),
-        record.title(),
+        paint(style::heading(), record.title()),
         metadata
     );
-    if state != State::NoStatus {
+    if let Some(status_value) = record.status(config) {
         line.push_str(" · ");
         line.push_str(&fill(labels.heading(), &[labels.status()]));
-        line.push_str(paint(state_style(state), crate::view::state_label(&labels, state)).as_str());
+        line.push_str(paint(state_style(state), &status_value).as_str());
     }
     if record.lifecycle().is_dropped() {
         line.push_str(" · ");

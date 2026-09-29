@@ -67,7 +67,9 @@ labels! {
     record_line => "record_line"; log_note => "log_note"; body_block => "body_block";
     heading_count => "heading_count"; counts_paren => "counts_paren"; indented_line => "indented_line";
     source_line => "source_line"; issue_line => "issue_line"; group_created => "group_created";
-    field_line => "field_line"; no_matches => "no_matches";
+    field_line => "field_line"; no_matches => "no_matches"; list_count => "list_count";
+    list_filter => "list_filter"; group_filter => "group_filter"; kind_filter => "kind_filter";
+    status_filter => "status_filter"; all_filter => "all_filter";
 }
 
 /// 用语言相关的句子模板渲染人读文本：模板里的 `{}` 按顺序被 `parts` 填充。

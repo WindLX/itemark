@@ -146,11 +146,17 @@ pub fn render_text(language: &str, overview: &Overview) -> String {
         &[labels.generated_at(), &overview.generated_at],
     ));
     let counts: Vec<String> = [
-        (labels.todo(), overview.count_of(State::Todo)),
-        (labels.in_progress(), overview.count_of(State::InProgress)),
-        (labels.blocked(), overview.count_of(State::Blocked)),
-        (labels.unverified(), overview.count_of(State::Unverified)),
-        (labels.done(), overview.count_of(State::Done)),
+        (State::Todo.as_key(), overview.count_of(State::Todo)),
+        (
+            State::InProgress.as_key(),
+            overview.count_of(State::InProgress),
+        ),
+        (State::Blocked.as_key(), overview.count_of(State::Blocked)),
+        (
+            State::Unverified.as_key(),
+            overview.count_of(State::Unverified),
+        ),
+        (State::Done.as_key(), overview.count_of(State::Done)),
     ]
     .iter()
     .map(|(label, count)| fill(labels.line(), &[label, &count.to_string()]))
@@ -170,7 +176,7 @@ pub fn render_text(language: &str, overview: &Overview) -> String {
         out.push_str(&fill(
             labels.heading_count(),
             &[
-                &paint(crate::style::heading(), state_label(&labels, state)),
+                &paint(crate::style::heading(), state_label(state)),
                 &matching.len().to_string(),
             ],
         ));
@@ -252,7 +258,7 @@ pub fn render_handoff(language: &str, overview: &Overview) -> String {
         out.push_str(&fill(
             labels.heading_count(),
             &[
-                &paint(crate::style::heading(), state_label(&labels, state)),
+                &paint(crate::style::heading(), state_label(state)),
                 &matching.len().to_string(),
             ],
         ));
@@ -356,15 +362,8 @@ pub fn handoff_json(overview: &Overview) -> serde_json::Value {
     })
 }
 
-pub(crate) fn state_label(labels: &crate::output::Labels, state: State) -> &'static str {
-    match state {
-        State::Todo => labels.todo(),
-        State::InProgress => labels.in_progress(),
-        State::Blocked => labels.blocked(),
-        State::Unverified => labels.unverified(),
-        State::Done => labels.done(),
-        State::NoStatus => labels.no_status(),
-    }
+pub(crate) fn state_label(state: State) -> &'static str {
+    state.as_key()
 }
 
 /// 把已渲染的摘要写成快照；仅显式保存时调用。

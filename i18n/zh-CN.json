@@ -96,7 +96,7 @@
   "arg_set": "设置声明字段，格式为 KEY=VALUE，可重复",
   "arg_body": "从文件读取记录正文",
   "arg_id": "稳定记录 ID",
-  "arg_status": "业务状态或声明值",
+  "arg_status": "筛选状态：内置 work 常见值为 todo、in_progress、blocked、done；其他取值按原文匹配。自定义 kind 的可选值请运行 `itemark kind show <名称>` 查看。",
   "arg_all": "包含已废弃记录",
   "arg_query": "搜索文本",
   "arg_unset": "移除声明字段，可重复",
@@ -140,6 +140,8 @@
   "diag_retry": "请重新读取并重试",
   "diag_expected_color": "颜色仅支持 auto、always、never，当前值：",
   "diag_expected_pair": "参数格式应为 KEY=VALUE，当前值：",
+  "diag_value_required": "此选项需要一个取值：",
+  "diag_none_supplied": "但没有提供取值。",
   "diag_empty_key": "字段名不能为空：",
   "diag_invalid_date": "日期格式应为 YYYY-MM-DD，当前值：",
   "diag_field": "字段",
@@ -185,5 +187,11 @@
   "diag_conjunction": "和",
   "diag_completion_before": "；记录完成前请补上，或明确标为未验证。",
   "diag_itemark_check": "事项检查",
-  "diag_issues_count": "个问题"
+  "diag_issues_count": "个问题",
+  "list_count": "共 {} 条记录",
+  "list_filter": "筛选条件：{}",
+  "group_filter": "分组={}",
+  "kind_filter": "kind={}",
+  "status_filter": "状态={}",
+  "all_filter": "包含已废弃记录"
 }

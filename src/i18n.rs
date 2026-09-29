@@ -153,6 +153,8 @@ pub fn localize_diagnostic(message: &str, language: &str) -> String {
             "diag_expected_color",
         ),
         ("expected `key=value`, got", "diag_expected_pair"),
+        ("a value is required for", "diag_value_required"),
+        ("but none was supplied", "diag_none_supplied"),
         ("expected a non-empty key in", "diag_empty_key"),
         ("expected `--date` as YYYY-MM-DD, got", "diag_date_format"),
         (

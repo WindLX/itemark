@@ -96,7 +96,7 @@
   "arg_set": "Set a declared field as KEY=VALUE; repeatable",
   "arg_body": "Read the record body from a file",
   "arg_id": "Stable record ID",
-  "arg_status": "Business status or declared value",
+  "arg_status": "Status filter: common built-in work values are todo, in_progress, blocked, and done; other values are matched verbatim. Use `itemark kind show <NAME>` to inspect values for a custom kind.",
   "arg_all": "Include dropped records",
   "arg_query": "Search text",
   "arg_unset": "Remove a declared field; repeatable",
@@ -155,6 +155,8 @@
   "diag_error": "error:",
   "diag_expected_color": "expected one of auto, always, never, got",
   "diag_expected_pair": "expected `key=value`, got",
+  "diag_value_required": "this option requires a value:",
+  "diag_none_supplied": "but no value was supplied.",
   "diag_field": "field",
   "diag_invalid_date": "expected `--date` as YYYY-MM-DD, got",
   "diag_invalid_type": "unsupported type",
@@ -185,5 +187,11 @@
   "diag_conjunction": "and",
   "diag_completion_before": "; add it (or mark the result as unverified) before recording completion",
   "diag_itemark_check": "itemark check",
-  "diag_issues_count": "issue(s)"
+  "diag_issues_count": "issue(s)",
+  "list_count": "{} record(s)",
+  "list_filter": "Filters: {}",
+  "group_filter": "group={}",
+  "kind_filter": "kind={}",
+  "status_filter": "status={}",
+  "all_filter": "including dropped records"
 }

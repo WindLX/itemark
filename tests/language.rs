@@ -40,6 +40,27 @@ fn language_override_option_is_removed() {
 }
 
 #[test]
+fn missing_status_value_uses_a_complete_localized_diagnostic() {
+    let project = Project::new();
+    project.configure();
+    let help = project.ok(&["list", "--help"]);
+    assert!(help.contains("todo、in_progress、blocked、done"), "{help}");
+    assert!(help.contains("kind show"), "{help}");
+
+    let (_, message) = project.fail(&["list", "--status"]);
+    assert!(message.contains("需要一个取值"), "{message}");
+    assert!(message.contains("--status <状态>"), "{message}");
+    assert!(!message.contains("a value is required"), "{message}");
+
+    let (_, help_message) = project.fail(&["list", "--status", "--help"]);
+    assert!(help_message.contains("需要一个取值"), "{help_message}");
+    assert!(
+        !help_message.contains("a value is required"),
+        "{help_message}"
+    );
+}
+
+#[test]
 fn init_selects_a_supported_system_language_and_persists_it() {
     let project = Project::new();
     let output = project.ok(&["init"]);

@@ -119,7 +119,35 @@ fn list(context: &Context, args: &ListArgs) -> Result<()> {
                 || record.status(config).as_deref() == Some(status)
         });
     }
-    item::print_records(context.mode, &language, workspace.config(), &records)
+    let labels = crate::output::labels(&language);
+    let mut filters = Vec::new();
+    if let Some(group) = args.group.as_deref() {
+        filters.push(crate::output::fill(labels.group_filter(), &[group]));
+    }
+    if let Some(kind) = args.kind.as_deref() {
+        filters.push(crate::output::fill(labels.kind_filter(), &[kind]));
+    }
+    if let Some(status) = args.status.as_deref() {
+        filters.push(crate::output::fill(labels.status_filter(), &[status]));
+    }
+    if args.all {
+        filters.push(labels.all_filter().to_string());
+    }
+    let mut list_header = crate::output::fill(labels.list_count(), &[&records.len().to_string()]);
+    if !filters.is_empty() {
+        list_header.push('\n');
+        list_header.push_str(&crate::output::fill(
+            labels.list_filter(),
+            &[&filters.join(labels.list_separator())],
+        ));
+    }
+    item::print_records(
+        context.mode,
+        &language,
+        workspace.config(),
+        &records,
+        Some(&list_header),
+    )
 }
 
 fn search(context: &Context, args: &SearchArgs) -> Result<()> {
@@ -129,7 +157,7 @@ fn search(context: &Context, args: &SearchArgs) -> Result<()> {
     if !args.all {
         records.retain(|record| !record.lifecycle().is_dropped());
     }
-    item::print_records(context.mode, &language, workspace.config(), &records)
+    item::print_records(context.mode, &language, workspace.config(), &records, None)
 }
 
 fn check(context: &Context, args: &args::CheckArgs) -> Result<()> {

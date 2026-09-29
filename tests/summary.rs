@@ -56,7 +56,7 @@ fn the_overview_labels_the_done_count_as_done() {
     ]);
 
     let text = project.ok(&["summary"]);
-    assert!(text.contains("已完成：1"), "{text}");
+    assert!(text.contains("done：1"), "{text}");
 }
 
 #[test]

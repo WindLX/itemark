@@ -3,7 +3,7 @@
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
 
-use crate::domain::{format_id, id_number};
+use crate::domain::{compare_ids, format_id, id_number};
 use crate::error::{Result, WorkspaceError};
 use crate::record::Record;
 
@@ -24,7 +24,8 @@ impl ItemIndex {
         for path in paths {
             records.push(Record::read(&path)?);
         }
-        records.sort_by(|left, right| left.id().unwrap_or("").cmp(right.id().unwrap_or("")));
+        records
+            .sort_by(|left, right| compare_ids(left.id().unwrap_or(""), right.id().unwrap_or("")));
         Ok(Self { records })
     }
 
@@ -67,7 +68,7 @@ impl ItemIndex {
             None => self.records.push(record),
         }
         self.records
-            .sort_by(|left, right| left.id().unwrap_or("").cmp(right.id().unwrap_or("")));
+            .sort_by(|left, right| compare_ids(left.id().unwrap_or(""), right.id().unwrap_or("")));
     }
 
     pub fn require(&self, id: &str) -> Result<&Record> {

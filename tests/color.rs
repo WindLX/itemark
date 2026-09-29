@@ -85,6 +85,37 @@ fn json_output_is_never_styled() {
 }
 
 #[test]
+fn list_styles_hierarchy_but_keeps_json_clean() {
+    let project = Project::new();
+    project.configure();
+    project.add_work("列表层级", "in_progress");
+
+    let text = project.ok(&["list", "--color", "always"]);
+    assert!(
+        text.contains(ESC),
+        "human list output should style headings and titles"
+    );
+    assert!(
+        text.contains("列表层级"),
+        "styling preserves the title: {text}"
+    );
+
+    let json = project.ok(&["list", "--json", "--color", "always"]);
+    assert!(!json.contains(ESC), "JSON remains plain: {json:?}");
+    serde_json::from_str::<serde_json::Value>(&json).expect("stdout is valid JSON");
+
+    let no_color = project
+        .command()
+        .env("NO_COLOR", "1")
+        .args(["list", "--color", "auto"])
+        .output()
+        .expect("run list with NO_COLOR");
+    assert!(no_color.status.success());
+    let text = String::from_utf8(no_color.stdout).expect("stdout is UTF-8");
+    assert!(!text.contains(ESC), "NO_COLOR keeps the list plain: {text:?}");
+}
+
+#[test]
 fn summary_and_check_follow_the_same_flag() {
     let project = Project::new();
     project.configure();

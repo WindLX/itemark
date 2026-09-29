@@ -2,6 +2,8 @@
 //!
 //! 命令名、ID、配置键与 JSON 字段名是稳定标识，不随项目语言翻译。
 
+use std::cmp::Ordering;
+
 /// 记录 ID 前缀；ID 在项目内唯一，且不依赖文件路径。
 pub const ID_PREFIX: &str = "IM-";
 /// Legacy prefix accepted while repositories migrate existing references.
@@ -17,6 +19,20 @@ pub fn id_number(id: &str) -> Option<u64> {
         return None;
     }
     digits.parse().ok()
+}
+
+/// Compare valid Itemark IDs by their numeric suffix, with a lexical fallback for
+/// equal numeric values and malformed IDs.
+#[must_use]
+pub fn compare_ids(left: &str, right: &str) -> Ordering {
+    match (id_number(left), id_number(right)) {
+        (Some(left_number), Some(right_number)) => {
+            left_number.cmp(&right_number).then_with(|| left.cmp(right))
+        }
+        (Some(_), None) => Ordering::Less,
+        (None, Some(_)) => Ordering::Greater,
+        (None, None) => left.cmp(right),
+    }
 }
 
 /// 按项目固定格式渲染 ID。
@@ -67,5 +83,12 @@ mod tests {
         assert_eq!(id_number("WL-abcd"), None);
         assert_eq!(id_number("0001"), None);
         assert_eq!(id_number("WL-0001x"), None);
+    }
+
+    #[test]
+    fn ids_compare_by_number_and_break_ties_lexically() {
+        assert_eq!(compare_ids("IM-2", "IM-10"), Ordering::Less);
+        assert_eq!(compare_ids("WL-0002", "IM-2"), Ordering::Greater);
+        assert_eq!(compare_ids("bad", "IM-2"), Ordering::Greater);
     }
 }
