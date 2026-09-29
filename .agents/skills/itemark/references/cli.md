@@ -88,4 +88,14 @@ kind 可选地声明一个完成字段及完成值（配置键 `completion_field
 
 这些场景在 CLI 中已可执行。记录的权威来源是 Markdown 文件；总览和交接由当前文件生成，不构成第二份状态。语言设置只影响 CLI 固定文案，不会更改模板创建后的用户正文。
 
+## 已确认设计（当前尚未实现）
+
+归档与废弃是独立生命周期。计划命令为 `itemark archive <ID>...` 和 `itemark unarchive <ID>...`；归档保留 ID 与业务状态，记录移至唯一来源目录 `<root>/archive`。默认 `list`、`search`、`summary` 隐藏归档项；三者提供 `--include-archived`，`list --archived` 仅显示归档项。`--all` 只控制废弃项，和归档选项互相独立。`show`、`check` 与按 ID 引用仍跨 `items/` 和 `archive/` 工作。
+
+计划的聚合命令为 `itemark merge <ID>... --title <标题> --group <group> [--set FIELD=VALUE ...] [--parent <ID>] [--dry-run]`。参数重复去重后须至少有两个不同 ID；来源必须同 kind，可跨 group；已归档来源可合并，废弃来源须先 `restore`。标题和目标 group 必须明确指定。`--dry-run` 展示候选 ID 与结果，不分配或保留 ID；正式写入在锁内重建索引、重新验证并分配 ID。
+
+聚合字段中，相同值直接保留，只有一个非空值时保留；不同值（包括业务状态或 parent）必须显式解决，禁止静默覆盖。`--set` 只设置 kind 声明字段，parent 使用专门选项。来源归档后记录 `merged_into`，原历史只追加去向，不改写来源历史或代码示例；新项以 `merged_from` 保留来源 ID。普通正文引用、外部 `depends_on` 和 parent 指向新项；聚合项的依赖取来源外部依赖并集、去重并排除来源之间的依赖。重定向不得产生自引用或重复关系。
+
+新聚合项带独立的 `needs_review` 标记。计划 `list --needs-review` 筛选该标记，`check` 对其提示，`update <ID> --reviewed` 清除它；这不改变业务状态，完成值的完成说明与证据规则仍适用。写入前准备所有结果并检查字段与关系冲突；若未先解决则不开始写入。此操作不承诺跨文件事务原子性：I/O 错误返回非零并说明已完成/未完成范围，可做简单回滚，不引入事务日志框架。以上命令和行为是已确认设计，尚待实现；安装版本的可用接口仍以实际 `itemark --help` 为准。
+
 建议的新项目布局为 `itemark.toml`、`<root>/items/`、`<root>/templates/` 和 `<root>/summaries/`。这是布局建议，不要求其他项目自动迁移既有手工记录。
