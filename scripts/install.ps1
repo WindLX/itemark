@@ -71,13 +71,14 @@ try {
         if ($env:PROCESSOR_ARCHITECTURE -notin @('AMD64', 'ARM64')) { throw "Unsupported Windows architecture: $env:PROCESSOR_ARCHITECTURE" }
         if (-not $BaseUrl) { $BaseUrl = "https://github.com/$Repo/releases/download/v$Version" }
         Write-Output "Downloading itemark v$Version for $releaseTarget"
-        $Archive = Join-Path $tempPath 'itemark.zip'
+        # Keep the published asset names: SHA256SUMS entries are keyed by them.
+        $Archive = Join-Path $tempPath "itemark-v$Version-$releaseTarget.zip"
         Save-ItemarkUrl "$BaseUrl/itemark-v$Version-$releaseTarget.zip" $Archive
         $sumsPath = Join-Path $tempPath 'SHA256SUMS'
         Save-ItemarkUrl "$BaseUrl/SHA256SUMS" $sumsPath
         Assert-ItemarkChecksum $Archive $sumsPath
         if ($SkillProfile -and -not $SkillArchive) {
-            $SkillArchive = Join-Path $tempPath 'itemark-skill.zip'
+            $SkillArchive = Join-Path $tempPath "itemark-skill-v$Version.zip"
             Save-ItemarkUrl "$BaseUrl/itemark-skill-v$Version.zip" $SkillArchive
             Assert-ItemarkChecksum $SkillArchive $sumsPath
         }
