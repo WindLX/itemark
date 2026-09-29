@@ -99,36 +99,46 @@ fn list(context: &Context, args: &ListArgs) -> Result<()> {
     if !args.all {
         records.retain(|record| !record.lifecycle().is_dropped());
     }
-    if let Some(group) = args.group.as_deref() {
+    let groups = unique_values(&args.group);
+    for group in &groups {
         if !workspace.config().has_group(group) {
             return Err(WorkspaceError::usage(format!(
                 "unknown group `{group}`; declared groups: {}",
                 declared_groups(workspace.config())
             )));
         }
-        records.retain(|record| record.group() == group);
     }
-    if let Some(kind) = args.kind.as_deref() {
-        records.retain(|record| record.kind().is_ok_and(|name| name == kind));
+    if !groups.is_empty() {
+        records.retain(|record| groups.contains(&record.group()));
     }
-    if let Some(status) = args.status.as_deref() {
+    let kinds = unique_values(&args.kind);
+    if !kinds.is_empty() {
+        records.retain(|record| record.kind().is_ok_and(|name| kinds.contains(&name)));
+    }
+    let statuses = unique_values(&args.status);
+    if !statuses.is_empty() {
         // 既接受判定键（`done_unverified`、`none`），也接受 kind 声明的原始取值。
         let config = workspace.config();
         records.retain(|record| {
-            crate::status::of(config, record).as_key() == status
-                || record.status(config).as_deref() == Some(status)
+            let state = crate::status::of(config, record).as_key();
+            let raw_status = record.status(config);
+            statuses
+                .iter()
+                .any(|status| state == *status || raw_status.as_deref() == Some(*status))
         });
     }
     let labels = crate::output::labels(&language);
     let mut filters = Vec::new();
-    if let Some(group) = args.group.as_deref() {
-        filters.push(crate::output::fill(labels.group_filter(), &[group]));
+    let or = crate::i18n::text("filter_or", &language);
+    let and = crate::i18n::text("filter_and", &language);
+    if !groups.is_empty() {
+        filters.push(filter_description(labels.group_filter(), &groups, or));
     }
-    if let Some(kind) = args.kind.as_deref() {
-        filters.push(crate::output::fill(labels.kind_filter(), &[kind]));
+    if !kinds.is_empty() {
+        filters.push(filter_description(labels.kind_filter(), &kinds, or));
     }
-    if let Some(status) = args.status.as_deref() {
-        filters.push(crate::output::fill(labels.status_filter(), &[status]));
+    if !statuses.is_empty() {
+        filters.push(filter_description(labels.status_filter(), &statuses, or));
     }
     if args.all {
         filters.push(labels.all_filter().to_string());
@@ -138,7 +148,7 @@ fn list(context: &Context, args: &ListArgs) -> Result<()> {
         list_header.push('\n');
         list_header.push_str(&crate::output::fill(
             labels.list_filter(),
-            &[&filters.join(labels.list_separator())],
+            &[&filters.join(&format!(" {and} "))],
         ));
     }
     item::print_records(
@@ -148,6 +158,21 @@ fn list(context: &Context, args: &ListArgs) -> Result<()> {
         &records,
         Some(&list_header),
     )
+}
+
+fn unique_values(values: &[String]) -> Vec<&str> {
+    let mut unique = Vec::new();
+    for value in values {
+        if !unique.contains(&value.as_str()) {
+            unique.push(value.as_str());
+        }
+    }
+    unique
+}
+
+fn filter_description(template: &str, values: &[&str], or: &str) -> String {
+    let separator = format!(" {or} ");
+    crate::output::fill(template, &[&values.join(&separator)])
 }
 
 fn search(context: &Context, args: &SearchArgs) -> Result<()> {

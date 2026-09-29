@@ -61,7 +61,7 @@ fn missing_status_value_uses_a_complete_localized_diagnostic() {
         help_message.contains("用法：itemark list"),
         "{help_message}"
     );
-    assert!(help_message.contains("筛选状态："), "{help_message}");
+    assert!(help_message.contains("可重复指定"), "{help_message}");
     let help_after_multiple_missing_options =
         project.ok(&["list", "--group", "--status", "--help"]);
     assert!(
@@ -75,7 +75,7 @@ fn missing_status_value_uses_a_complete_localized_diagnostic() {
         english_help.contains("Usage: itemark list"),
         "{english_help}"
     );
-    assert!(english_help.contains("Status filter:"), "{english_help}");
+    assert!(english_help.contains("Repeatable"), "{english_help}");
     assert!(!english_help.contains("错误："), "{english_help}");
     let (_, english_error) = project.fail(&["list", "--status"]);
     assert!(

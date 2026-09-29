@@ -122,17 +122,17 @@ pub struct ShowArgs {
 
 #[derive(Debug, Args)]
 pub struct ListArgs {
-    /// 只看某个 group
+    /// 只看一个或多个 group；重复传入时多个值按 OR 匹配
     #[arg(long, value_name = "group 名称")]
-    pub group: Option<String>,
+    pub group: Vec<String>,
 
-    /// 只看某个 kind
+    /// 只看一个或多个 kind；重复传入时多个值按 OR 匹配
     #[arg(long, value_name = "kind 名称")]
-    pub kind: Option<String>,
+    pub kind: Vec<String>,
 
-    /// 只看某个业务状态：判定键（todo/in_progress/blocked/done_unverified/done/none）或 kind 声明的原始取值
+    /// 只看一个或多个业务状态；重复传入时多个值按 OR 匹配，支持判定键或 kind 声明的原始值
     #[arg(long, value_name = "状态")]
-    pub status: Option<String>,
+    pub status: Vec<String>,
 
     /// 包含已废弃记录
     #[arg(long)]
@@ -349,7 +349,12 @@ fn localize(command: clap::Command, english: bool, parent: &str) -> clap::Comman
                 section_options
             };
             let mut arg = arg.help_heading(heading);
-            if let Some(help) = crate::i18n::argument_help(&id, locale) {
+            let help = if current == "list" && matches!(id.as_str(), "group" | "kind" | "status") {
+                crate::i18n::optional_text(&format!("list_arg_{id}"), locale)
+            } else {
+                crate::i18n::argument_help(&id, locale)
+            };
+            if let Some(help) = help {
                 arg = arg.help(help).long_help(help);
             }
             let value_name = if english {

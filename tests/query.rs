@@ -146,6 +146,124 @@ fn list_displays_status_values_verbatim_and_names_active_filters() {
     );
 }
 
+#[test]
+fn list_combines_repeated_filters_with_or_and_cross_field_and() {
+    let project = Project::new();
+    project.configure();
+    let config = CONFIG.replace(
+        "values = [\"todo\", \"in_progress\", \"blocked\", \"done\"]",
+        "values = [\"todo\", \"in_progress\", \"blocked\", \"done\", \"review\"]",
+    );
+    project.write("itemark.toml", &config);
+    let todo = project.add_work("待办工作", "todo");
+    let in_progress = project.add_work("进行中工作", "in_progress");
+    project.ok(&["update", &in_progress, "--group", "研究"]);
+    let blocked = project.add_work("阻塞工作", "blocked");
+    let note = project.add_note("研究笔记", "研究");
+    let custom_status = project.add_work("自定义状态工作", "review");
+
+    let statuses = project.ok(&[
+        "list",
+        "--status",
+        "todo",
+        "--status",
+        "in_progress",
+        "--json",
+    ]);
+    assert_eq!(ids_in(&statuses), [todo.as_str(), in_progress.as_str()]);
+
+    let raw_status = project.ok(&["list", "--status", "review", "--json"]);
+    assert_eq!(ids_in(&raw_status), [custom_status.as_str()]);
+
+    let groups = project.ok(&["list", "--group", "产品", "--group", "研究", "--json"]);
+    assert_eq!(
+        ids_in(&groups),
+        [
+            todo.as_str(),
+            in_progress.as_str(),
+            blocked.as_str(),
+            note.as_str(),
+            custom_status.as_str()
+        ]
+    );
+
+    let kinds = project.ok(&["list", "--kind", "work", "--kind", "project-note", "--json"]);
+    assert_eq!(
+        ids_in(&kinds),
+        [
+            todo.as_str(),
+            in_progress.as_str(),
+            blocked.as_str(),
+            note.as_str(),
+            custom_status.as_str()
+        ]
+    );
+
+    let combined = project.ok(&[
+        "list",
+        "--group",
+        "研究",
+        "--group",
+        "产品",
+        "--kind",
+        "project-note",
+        "--kind",
+        "work",
+        "--status",
+        "todo",
+        "--status",
+        "in_progress",
+        "--status",
+        "todo",
+        "--json",
+    ]);
+    assert_eq!(ids_in(&combined), [todo.as_str(), in_progress.as_str()]);
+
+    let text = project.ok(&[
+        "list",
+        "--group",
+        "产品",
+        "--group",
+        "研究",
+        "--group",
+        "产品",
+        "--status",
+        "todo",
+        "--status",
+        "in_progress",
+        "--status",
+        "todo",
+    ]);
+    assert!(text.contains("分组=产品 或 研究"), "{text}");
+    assert!(text.contains("状态=todo 或 in_progress"), "{text}");
+    assert!(text.contains("共 2 条记录"), "{text}");
+    assert_eq!(
+        text.lines().nth(1),
+        Some("筛选条件：分组=产品 或 研究 且 状态=todo 或 in_progress")
+    );
+
+    let comma_is_one_literal_value =
+        project.ok(&["list", "--status", "todo,in_progress", "--json"]);
+    assert_eq!(
+        serde_json::from_str::<serde_json::Value>(&comma_is_one_literal_value).unwrap()["count"],
+        0
+    );
+}
+
+#[test]
+fn list_help_explains_repeatable_or_and_and_filter_values() {
+    let project = Project::new();
+    project.configure();
+    let zh = project.ok(&["list", "--help"]);
+    assert!(zh.contains("重复"), "{zh}");
+    assert!(zh.contains("OR") && zh.contains("AND"), "{zh}");
+
+    project.write("itemark.toml", &CONFIG.replace("zh-CN", "en"));
+    let en = project.ok(&["list", "--help"]);
+    assert!(en.to_lowercase().contains("repeat"), "{en}");
+    assert!(en.contains("OR") && en.contains("AND"), "{en}");
+}
+
 fn json_ids(json: &str, key: &str) -> Vec<String> {
     serde_json::from_str::<serde_json::Value>(json).expect("valid JSON output")[key]
         .as_array()

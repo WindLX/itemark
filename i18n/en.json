@@ -73,7 +73,7 @@
   "cmd_init": "Initialize project configuration and recommended directories",
   "cmd_add": "Add a record of the given kind; Itemark assigns its stable ID",
   "cmd_show": "Show one record by stable ID",
-  "cmd_list": "List records, optionally filtered by group, kind, or status",
+  "cmd_list": "List records; values within one filter use OR, while different filters use AND",
   "cmd_search": "Search current record content",
   "cmd_update": "Update selected fields or sections, or move a record to another group",
   "cmd_log": "Append a dated progress entry",
@@ -194,5 +194,10 @@
   "group_filter": "group={}",
   "kind_filter": "kind={}",
   "status_filter": "status={}",
-  "all_filter": "including dropped records"
+  "all_filter": "including dropped records",
+  "filter_or": "OR",
+  "filter_and": "AND",
+  "list_arg_group": "Repeatable; multiple groups are matched with OR. Commas are literal value characters.",
+  "list_arg_kind": "Repeatable; multiple kinds are matched with OR. Commas are literal value characters.",
+  "list_arg_status": "Repeatable; state keys or raw kind values are matched with OR. Work examples: todo, in_progress, blocked, done. Use `itemark kind show <NAME>` to inspect a custom kind. Commas are literal value characters."
 }

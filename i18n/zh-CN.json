@@ -73,7 +73,7 @@
   "cmd_init": "初始化项目配置与推荐目录",
   "cmd_add": "按指定 kind 添加记录；稳定 ID 由 Itemark 分配",
   "cmd_show": "按稳定 ID 查看一条记录",
-  "cmd_list": "列出记录，可按 group、kind 或状态过滤",
+  "cmd_list": "列出记录；同一字段的多值按 OR 匹配，不同筛选字段按 AND 组合",
   "cmd_search": "搜索当前记录内容",
   "cmd_update": "定点更新字段或正文分节，也可移动 group",
   "cmd_log": "追加一条带日期的进展",
@@ -194,5 +194,10 @@
   "group_filter": "分组={}",
   "kind_filter": "kind={}",
   "status_filter": "状态={}",
-  "all_filter": "包含已废弃记录"
+  "all_filter": "包含已废弃记录",
+  "filter_or": "或",
+  "filter_and": "且",
+  "list_arg_group": "可重复指定；多个 group 按 OR 匹配。逗号属于值本身，不会拆分。",
+  "list_arg_kind": "可重复指定；多个 kind 按 OR 匹配。逗号属于值本身，不会拆分。",
+  "list_arg_status": "可重复指定；多个判定键或 kind 原始状态按 OR 匹配。工作事项值示例：todo、in_progress、blocked、done；自定义 kind 请运行 `itemark kind show <名称>` 查看。逗号属于值本身，不会拆分。"
 }
