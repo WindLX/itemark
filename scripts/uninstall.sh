@@ -1,8 +1,12 @@
 #!/bin/sh
+# Itemark uninstaller: like the installer, it can be run straight from the network.
+#
+#   curl -fsSL https://raw.githubusercontent.com/WindLX/itemark/main/scripts/uninstall.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/WindLX/itemark/main/scripts/uninstall.sh | sh -s -- --prefix "$HOME/.local"
 set -eu
 
-prefix=${HOME:?HOME must be set}/.local
-usage() { echo "Usage: uninstall.sh [--prefix DIR]"; }
+prefix=${ITEMARK_PREFIX:-${HOME:?HOME must be set}/.local}
+usage() { echo "Usage: uninstall.sh [--prefix DIR]   (default: \$HOME/.local)"; }
 while [ "$#" -gt 0 ]; do
     case "$1" in
         --prefix) prefix=${2:?missing value for --prefix}; shift 2 ;;

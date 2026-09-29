@@ -1,5 +1,7 @@
+# Itemark uninstaller for Windows. Safe to run online:
+#   irm https://raw.githubusercontent.com/WindLX/itemark/main/scripts/uninstall.ps1 | iex
 [CmdletBinding()]
-param([string]$Prefix = (Join-Path $env:LOCALAPPDATA 'Programs\Itemark'))
+param([string]$Prefix = $(if ($env:ITEMARK_PREFIX) { $env:ITEMARK_PREFIX } else { Join-Path $env:LOCALAPPDATA 'Programs\Itemark' }))
 $ErrorActionPreference = 'Stop'
 
 $prefixPath = [IO.Path]::GetFullPath($Prefix)

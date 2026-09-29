@@ -1,11 +1,25 @@
 #!/bin/sh
+# Itemark installer: installs from a GitHub Release by default, or from a local
+# archive when --archive is given. Safe to pipe from curl.
+#
+#   curl -fsSL https://raw.githubusercontent.com/WindLX/itemark/main/scripts/install.sh | sh
+#   curl -fsSL https://raw.githubusercontent.com/WindLX/itemark/main/scripts/install.sh | sh -s -- --version 0.1.0
+#
+# Offline:
+#   ./install.sh --archive itemark-v0.1.0-x86_64-unknown-linux-gnu.tar.gz
 set -eu
 
+repo=${ITEMARK_REPO:-WindLX/itemark}
+version=${ITEMARK_VERSION:-}
+prefix=${ITEMARK_PREFIX:-${HOME:?HOME must be set}/.local}
+base_url=${ITEMARK_BASE_URL:-}
 archive=
-prefix=${HOME:?HOME must be set}/.local
 skill_archive=
 skill_profile=
 skill_home=
+release_target=
+have_curl=0
+have_wget=0
 binary_stage=
 receipt_stage=
 skill_dest=
@@ -16,12 +30,21 @@ tmp=$(mktemp -d)
 
 usage() {
     cat <<'EOF'
-Usage: install.sh --archive FILE [--prefix DIR] [--skill-archive FILE]
-                  [--skill-profile codex|claude] [--skill-home DIR]
+Usage:
+  install.sh [--version V|latest] [--prefix DIR] [--repo OWNER/REPO]
+             [--base-url URL] [--skill-profile codex|claude] [--skill-home DIR]
+  install.sh --archive FILE [--prefix DIR] [--skill-archive FILE]
+             [--skill-profile codex|claude] [--skill-home DIR]
 
-Installs a local release archive. The optional skill archive is separate from
-the binary archive. --skill-home overrides the per-user skill parent directory
-for isolated installs and testing.
+Without --archive the installer downloads the archive for this platform from
+GitHub Releases; --version defaults to latest and --prefix defaults to
+$HOME/.local (the binary goes to $prefix/bin/itemark). With --archive it
+installs a local archive instead, and any skill package must be passed
+separately with --skill-archive. --skill-profile also installs a skill package
+(downloaded in online mode) for the codex or claude profile. --base-url
+overrides the release asset directory (mirror or test use) and requires
+--version. Environment: ITEMARK_VERSION, ITEMARK_PREFIX, ITEMARK_REPO,
+ITEMARK_BASE_URL.
 EOF
 }
 
@@ -46,8 +69,11 @@ trap 'exit 143' TERM
 
 while [ "$#" -gt 0 ]; do
     case "$1" in
+        --version) version=${2:?missing value for --version}; shift 2 ;;
         --archive) archive=${2:?missing value for --archive}; shift 2 ;;
         --prefix) prefix=${2:?missing value for --prefix}; shift 2 ;;
+        --repo) repo=${2:?missing value for --repo}; shift 2 ;;
+        --base-url) base_url=${2:?missing value for --base-url}; shift 2 ;;
         --skill-archive) skill_archive=${2:?missing value for --skill-archive}; shift 2 ;;
         --skill-profile) skill_profile=${2:?missing value for --skill-profile}; shift 2 ;;
         --skill-home) skill_home=${2:?missing value for --skill-home}; shift 2 ;;
@@ -56,7 +82,93 @@ while [ "$#" -gt 0 ]; do
     esac
 done
 
-[ -n "$archive" ] || { echo "--archive is required" >&2; exit 2; }
+download() {
+    if [ "$have_curl" -eq 1 ]; then
+        curl -fsSL -o "$2" "$1"
+    else
+        wget -q -O "$2" "$1"
+    fi
+}
+
+sha256_file() {
+    if command -v sha256sum >/dev/null 2>&1; then
+        sha256sum "$1" | awk '{print $1}'
+    elif command -v shasum >/dev/null 2>&1; then
+        shasum -a 256 "$1" | awk '{print $1}'
+    elif command -v openssl >/dev/null 2>&1; then
+        openssl dgst -sha256 "$1" | awk '{print $NF}'
+    else
+        echo "sha256sum, shasum or openssl is required to verify the download" >&2
+        exit 1
+    fi
+}
+
+verify_checksum() {
+    file=$1
+    sums=$2
+    name=${file##*/}
+    expected=$(awk -v name="$name" '$2 == name { print $1; exit }' "$sums")
+    [ -n "$expected" ] || { echo "SHA256SUMS has no entry for $name" >&2; exit 1; }
+    actual=$(sha256_file "$file")
+    [ "$expected" = "$actual" ] || { echo "checksum mismatch for $name" >&2; exit 1; }
+}
+
+latest_release_version() {
+    if [ "$have_curl" -eq 1 ]; then
+        url=$(curl -fsSLI -o /dev/null -w '%{url_effective}' "https://github.com/${repo}/releases/latest") ||
+            { echo "cannot query the latest release of ${repo}" >&2; exit 1; }
+    else
+        url=$(wget -qS --spider "https://github.com/${repo}/releases/latest" 2>&1 |
+            sed -n 's/^[[:space:]]*[Ll]ocation:[[:space:]]*//p' | tail -n 1)
+    fi
+    tag=${url##*/}
+    case "$tag" in
+        v[0-9]*) printf '%s\n' "${tag#v}" ;;
+        *) echo "no released version found for ${repo} (latest redirects to $url)" >&2; exit 1 ;;
+    esac
+}
+
+if [ -z "$archive" ]; then
+    command -v curl >/dev/null 2>&1 && have_curl=1
+    command -v wget >/dev/null 2>&1 && have_wget=1
+    if [ "$have_curl" -eq 0 ] && [ "$have_wget" -eq 0 ]; then
+        echo "online install needs curl or wget; use --archive to install a local archive" >&2
+        exit 1
+    fi
+    case "$version" in
+        ""|latest)
+            [ -z "$base_url" ] || { echo "--base-url requires an explicit --version" >&2; exit 2; }
+            version=$(latest_release_version)
+            ;;
+        v*) version=${version#v} ;;
+    esac
+    printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-+][A-Za-z0-9.]+)?$' ||
+        { echo "invalid version: $version (expected something like 0.1.0)" >&2; exit 2; }
+    case "$(uname -s)/$(uname -m)" in
+        Linux/x86_64|Linux/amd64) release_target=x86_64-unknown-linux-gnu ;;
+        Linux/aarch64|Linux/arm64) release_target=aarch64-unknown-linux-gnu ;;
+        Darwin/x86_64) release_target=x86_64-apple-darwin ;;
+        Darwin/arm64|Darwin/aarch64) release_target=aarch64-apple-darwin ;;
+        *)
+            echo "unsupported platform: $(uname -s)/$(uname -m)" >&2
+            echo "release archives exist for Linux/macOS on x86_64 and aarch64; on Windows use scripts/install.ps1" >&2
+            exit 1
+            ;;
+    esac
+    base_url=${base_url:-https://github.com/${repo}/releases/download/v${version}}
+    archive="$tmp/itemark-v${version}-${release_target}.tar.gz"
+    sums="$tmp/SHA256SUMS"
+    echo "Downloading itemark v${version} for ${release_target}"
+    download "${base_url}/itemark-v${version}-${release_target}.tar.gz" "$archive"
+    download "${base_url}/SHA256SUMS" "$sums"
+    verify_checksum "$archive" "$sums"
+    if [ -n "$skill_profile" ] && [ -z "$skill_archive" ]; then
+        skill_archive="$tmp/itemark-skill-v${version}.zip"
+        download "${base_url}/itemark-skill-v${version}.zip" "$skill_archive"
+        verify_checksum "$skill_archive" "$sums"
+    fi
+fi
+
 [ -f "$archive" ] || { echo "archive not found: $archive" >&2; exit 1; }
 if [ -n "$skill_archive" ]; then
     [ -f "$skill_archive" ] || { echo "skill archive not found: $skill_archive" >&2; exit 1; }
@@ -121,4 +233,7 @@ if [ -n "$skill_archive" ]; then
 fi
 
 echo "Installed $binary"
-echo "Add $prefix/bin to PATH if needed."
+case ":${PATH:-}:" in
+    *":${prefix}/bin:"*) ;;
+    *) printf 'Add %s/bin to PATH to run itemark directly:\n  export PATH="%s/bin:$PATH"\n' "$prefix" "$prefix" ;;
+esac
