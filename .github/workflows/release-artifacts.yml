@@ -43,7 +43,7 @@ jobs:
 
   binary:
     name: Build ${{ matrix.target }}
-    needs: version
+    needs: [version, skill]
     strategy:
       fail-fast: false
       matrix:
@@ -92,6 +92,76 @@ jobs:
           Copy-Item LICENSE dist/LICENSE
           $archive = "itemark-v$env:VERSION-$env:TARGET.zip"
           Compress-Archive -Path dist/* -DestinationPath $archive
+      - uses: actions/download-artifact@v4
+        with:
+          name: itemark-skill
+          path: skill-bundle
+      - name: Smoke-test Unix archive installer
+        if: runner.os != 'Windows'
+        shell: bash
+        env:
+          VERSION: ${{ needs.version.outputs.value }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          temp_root=$(mktemp -d "$RUNNER_TEMP/itemark-install-smoke.XXXXXX")
+          trap 'rm -rf "$temp_root"' EXIT
+          prefix="$temp_root/prefix"
+          skills="$temp_root/skills"
+          project="$temp_root/project"
+          mkdir -p "$prefix" "$project/itemark/items"
+          printf 'keep this unrelated file\n' > "$prefix/user-file.txt"
+          printf 'keep project records\n' > "$project/itemark/items/keep.md"
+          archive="itemark-v${VERSION}-${TARGET}.tar.gz"
+          skill_archive="skill-bundle/itemark-skill-v${VERSION}.zip"
+          scripts/install.sh --archive "$archive" --prefix "$prefix" \
+            --skill-archive "$skill_archive" --skill-profile codex --skill-home "$skills"
+          [[ $("$prefix/bin/itemark" --version) == "itemark $VERSION" ]]
+          test -f "$skills/itemark/SKILL.md"
+          test -f "$skills/itemark/references/cli.md"
+          scripts/uninstall.sh --prefix "$prefix"
+          test ! -e "$prefix/bin/itemark"
+          test ! -e "$prefix/.itemark-install"
+          test -f "$prefix/user-file.txt"
+          test -d "$prefix/bin"
+          test ! -e "$skills/itemark"
+          test -d "$skills"
+          test -f "$project/itemark/items/keep.md"
+      - name: Smoke-test Windows archive installer
+        if: runner.os == 'Windows'
+        shell: pwsh
+        env:
+          VERSION: ${{ needs.version.outputs.value }}
+          TARGET: ${{ matrix.target }}
+        run: |
+          $tempRoot = Join-Path $env:RUNNER_TEMP ('itemark-install-smoke-' + [Guid]::NewGuid().ToString('N'))
+          $prefix = Join-Path $tempRoot 'prefix'
+          $skills = Join-Path $tempRoot 'skills'
+          $project = Join-Path $tempRoot 'project'
+          $installer = Join-Path $env:GITHUB_WORKSPACE 'scripts\install.ps1'
+          $uninstaller = Join-Path $env:GITHUB_WORKSPACE 'scripts\uninstall.ps1'
+          try {
+            New-Item -ItemType Directory -Force -Path $prefix | Out-Null
+            New-Item -ItemType Directory -Force -Path (Join-Path $project 'itemark\items') | Out-Null
+            'keep this unrelated file' | Set-Content -LiteralPath (Join-Path $prefix 'user-file.txt')
+            'keep project records' | Set-Content -LiteralPath (Join-Path $project 'itemark\items\keep.md')
+            $archive = "itemark-v${env:VERSION}-${env:TARGET}.zip"
+            $skillArchive = Join-Path 'skill-bundle' "itemark-skill-v${env:VERSION}.zip"
+            & $installer -Archive $archive -Prefix $prefix -SkillArchive $skillArchive -SkillProfile codex -SkillHome $skills
+            $binary = Join-Path $prefix 'itemark.exe'
+            $actualVersion = (& $binary --version | Out-String).Trim()
+            if ($LASTEXITCODE -ne 0 -or $actualVersion -ne "itemark $env:VERSION") { throw "Installed binary check failed: $actualVersion" }
+            if (-not (Test-Path -LiteralPath (Join-Path $skills 'itemark\SKILL.md') -PathType Leaf)) { throw 'Installed skill is missing SKILL.md' }
+            if (-not (Test-Path -LiteralPath (Join-Path $skills 'itemark\references\cli.md') -PathType Leaf)) { throw 'Installed skill is missing references/cli.md' }
+            & $uninstaller -Prefix $prefix
+            if (Test-Path -LiteralPath $binary) { throw 'Uninstaller left the installed binary' }
+            if (Test-Path -LiteralPath (Join-Path $prefix '.itemark-install')) { throw 'Uninstaller left its receipt' }
+            if (-not (Test-Path -LiteralPath (Join-Path $prefix 'user-file.txt') -PathType Leaf)) { throw 'Uninstaller removed unrelated user data' }
+            if (Test-Path -LiteralPath (Join-Path $skills 'itemark')) { throw 'Uninstaller left the managed skill' }
+            if (-not (Test-Path -LiteralPath (Join-Path $project 'itemark\items\keep.md') -PathType Leaf)) { throw 'Uninstaller removed project records' }
+          }
+          finally {
+            if (Test-Path -LiteralPath $tempRoot) { Remove-Item -LiteralPath $tempRoot -Recurse -Force }
+          }
       - uses: actions/upload-artifact@v4
         with:
           name: itemark-${{ matrix.target }}
